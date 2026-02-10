@@ -1,0 +1,66 @@
+use serde::{Deserialize, Serialize};
+
+/// 文件节点（用于文件夹树）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileNode {
+    pub path: String,
+    pub name: String,
+    pub is_dir: bool,
+    pub children: Option<Vec<FileNode>>,
+    pub expanded: bool,
+}
+
+/// 图片文件信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageFileInfo {
+    pub path: String,
+    pub name: String,
+    pub extension: String,
+    pub size: u64,
+    pub size_formatted: String,
+    pub width: u32,
+    pub height: u32,
+    pub modified: i64,
+    pub modified_formatted: String,
+    pub thumbnail_path: Option<String>,
+}
+
+/// 裁剪参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CropParams {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// 调整尺寸参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResizeParams {
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub maintain_aspect: bool,
+}
+
+/// 色彩调整参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ColorAdjustParams {
+    pub brightness: f32,
+    pub contrast: f32,
+    pub saturation: f32,
+}
+
+/// 编辑操作
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum EditOperation {
+    Crop(CropParams),
+    Rotate { degrees: i32 },
+    FlipHorizontal,
+    FlipVertical,
+    Resize(ResizeParams),
+    AdjustColors(ColorAdjustParams),
+}
