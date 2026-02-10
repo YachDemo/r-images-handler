@@ -11,21 +11,27 @@ export function MainContent() {
     return selectedPath.split("/").pop() || selectedPath;
   };
 
-  // 确保背景颜色是卡片颜色，而不是 App 的纯黑底色
+  // 确保背景颜色与面板一致
   return (
-    <main className="flex-1 bg-[#121215] flex flex-col h-full w-full overflow-hidden">
-      {/* 面包屑导航 */}
+    <main className="flex-1 bg-[var(--bg-surface)] flex flex-col h-full w-full overflow-hidden">
+      {/* 面包屑导航 - 增加垂直边距防止被圆角截断 */}
       {rootPaths.length > 0 && (
-        <div className="h-10 px-4 flex items-center border-b border-white/5 bg-white/5 shrink-0">
-          <Folder className="w-3.5 h-3.5 text-indigo-400 mr-2" />
-          <span className="text-[11px] text-zinc-400 font-bold uppercase tracking-widest">Studio</span>
-          <ChevronRight className="w-3 h-3 mx-2 text-zinc-600" />
-          <span className="text-[11px] text-zinc-100 font-bold truncate">{getSelectedFolderName()}</span>
+        <div className="h-12 px-6 flex items-center border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/50 shrink-0">
+          <Folder className="w-4 h-4 text-[var(--accent)] mr-3" />
+          <span className="text-[10px] text-[var(--text-muted)] font-black uppercase tracking-[0.2em]">Studio</span>
+          <ChevronRight className="w-3 h-3 mx-3 text-[var(--text-muted)] opacity-50" />
+          <span className="text-[11px] text-[var(--text-primary)] font-black uppercase tracking-widest truncate">{getSelectedFolderName()}</span>
+          
+          <div className="ml-auto flex items-center gap-3">
+            <div className="px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+              <span className="text-[10px] text-[var(--accent)] font-mono font-bold tracking-tighter">{images.length} ITEMS</span>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* 内容滚动区 */}
-      <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+      {/* 内容滚动区 - 增加内边距 */}
+      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
         {isLoading ? (
           <SkeletonGrid count={12} />
         ) : rootPaths.length > 0 ? (

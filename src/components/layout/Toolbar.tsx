@@ -83,85 +83,49 @@ export function Toolbar() {
   };
 
     return (
-
-      <header className="h-[var(--toolbar-height)] bg-[var(--bg-surface)] px-8 flex items-center justify-between gap-8 z-20">
-
+      <header className="h-[var(--toolbar-height)] bg-[var(--bg-surface)] px-6 flex items-center justify-between gap-8 z-20">
         {/* 左侧：导航按钮 */}
-
-        <div className="flex items-center gap-3 flex-shrink-0">
-
+        <div className="flex items-center gap-4 flex-shrink-0">
           <Button
-
             variant="primary"
-
-            size="sm"
-
+            size="lg"
             title="添加文件夹到工作区"
-
             onClick={handleAddFolder}
-
             disabled={isLoading}
-
-            className="gap-2.5 px-5 rounded-xl shadow-lg shadow-indigo-500/10 font-semibold"
-
+            className="gap-3 px-6 rounded-2xl shadow-xl shadow-indigo-500/20 font-black italic tracking-widest"
           >
-
             {isLoading ? (
-
               <Loader2 className="w-4 h-4 animate-spin" />
-
             ) : (
-
               <FolderPlus className="w-4 h-4" />
-
             )}
-
-            <span>添加文件夹</span>
-
+            <span>添加目录</span>
           </Button>
+          
+          <div className="h-8 w-px bg-white/5 mx-2" />
 
           <Button
-
             variant="ghost"
-
             size="sm"
-
             title="添加图片文件"
-
             onClick={handleOpenFiles}
-
             disabled={isLoading}
-
-            className="rounded-xl w-10 h-10 p-0"
-
+            className="rounded-xl w-9 h-9 p-0"
           >
-
-            <File className="w-4.5 h-4.5" />
-
+            <File className="w-4 h-4" />
           </Button>
 
           {rootPaths.length > 0 && (
-
             <Button
-
               variant="ghost"
-
               size="sm"
-
               title="清空工作区"
-
               onClick={handleClearWorkspace}
-
-              className="text-[var(--text-muted)] hover:text-[var(--status-error)] rounded-xl w-10 h-10 p-0"
-
+              className="text-[var(--text-muted)] hover:text-[var(--status-error)] rounded-xl w-9 h-9 p-0"
             >
-
-              <Trash2 className="w-4.5 h-4.5" />
-
+              <Trash2 className="w-4 h-4" />
             </Button>
-
           )}
-
         </div>
 
   

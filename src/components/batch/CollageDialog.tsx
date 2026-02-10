@@ -420,22 +420,26 @@ export function CollageDialog() {
   if (!isOpen || !selectedTemplate) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-[900px] max-h-[90vh] bg-[var(--md-sys-color-surface-container)] rounded-[20px] border border-[var(--md-sys-color-outline-variant)]/50 shadow-2xl flex flex-col overflow-hidden">
-        {/* 头部 */}
-        <div className="flex items-center justify-between p-6 pb-4 border-b border-[var(--md-sys-color-outline-variant)]/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--md-sys-color-primary-container)] flex items-center justify-center">
-              <Grid3X3 className="w-5 h-5 text-[var(--md-sys-color-on-primary-container)]" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in">
+      <div className="w-[940px] max-h-[90vh] bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-strong)] shadow-2xl flex flex-col overflow-hidden animate-slide-in">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/50">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-[var(--radius)] bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20 shadow-inner">
+              <Grid3X3 className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-[var(--md-sys-color-on-surface)]">创建拼图</h2>
-              <p className="text-sm text-[var(--md-sys-color-on-surface-variant)]">{files.length} 张图片</p>
+              <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">智能拼图</h2>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="px-2 py-0.5 rounded-full bg-[var(--bg-surface-active)] text-[var(--text-secondary)] text-[10px] font-bold uppercase tracking-wider">
+                  已选择 {files.length} 张图片
+                </span>
+              </div>
             </div>
           </div>
           <button
             onClick={closeDialog}
-            className="p-2 rounded-full hover:bg-[var(--md-sys-color-on-surface)]/10 text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] transition-colors"
+            className="w-10 h-10 rounded-full hover:bg-[var(--bg-surface-hover)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all border border-transparent hover:border-[var(--border-subtle)]"
           >
             <X className="w-5 h-5" />
           </button>
@@ -443,9 +447,9 @@ export function CollageDialog() {
 
         <div className="flex flex-1 overflow-hidden">
           {/* 左侧：模板选择 */}
-          <div className="w-[220px] p-3 border-r border-[var(--md-sys-color-outline-variant)]/50 overflow-y-auto bg-[var(--md-sys-color-surface-container-low)]">
-            <p className="text-xs font-medium text-[var(--md-sys-color-on-surface-variant)] uppercase tracking-wider mb-3 px-2">选择模板</p>
-            <div className="space-y-2">
+          <div className="w-[220px] p-4 border-r border-[var(--border-subtle)] overflow-y-auto bg-[var(--bg-app)]/50">
+            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-[0.15em] mb-4 px-1">布局方案</p>
+            <div className="space-y-2.5">
               {templates.map((template) => {
                 const isSelected = selectedTemplate.id === template.id;
                 return (
@@ -453,23 +457,26 @@ export function CollageDialog() {
                     key={template.id}
                     onClick={() => setSelectedTemplate(template)}
                     className={cn(
-                      "w-full p-3 rounded-xl text-left transition-all ripple",
+                      "w-full p-2.5 rounded-xl text-left transition-all border group",
                       isSelected
-                        ? "bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)] shadow-sm"
-                        : "hover:bg-[var(--md-sys-color-on-surface)]/5 text-[var(--md-sys-color-on-surface)]"
+                        ? "bg-[var(--accent-surface)] border-[var(--accent)]/40 shadow-sm"
+                        : "bg-transparent border-transparent hover:bg-[var(--bg-surface-hover)]"
                     )}
                   >
                     {/* 模板预览缩略图 */}
                     <div
                       className={cn(
-                        "w-full aspect-square rounded-lg mb-2 overflow-hidden p-0.5 transition-colors",
-                         isSelected ? "bg-[var(--md-sys-color-on-secondary-container)]/10" : "bg-[var(--md-sys-color-surface-container-highest)]"
+                        "w-full aspect-square rounded-lg mb-2.5 overflow-hidden p-1 transition-colors",
+                         isSelected ? "bg-white/5" : "bg-black/20"
                       )}
                       style={{ aspectRatio: template.aspectRatio }}
                     >
                       <TemplatePreview template={template} count={files.length} />
                     </div>
-                    <p className="text-sm font-medium truncate">{template.name}</p>
+                    <p className={cn(
+                      "text-xs font-bold truncate",
+                      isSelected ? "text-[var(--accent)]" : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
+                    )}>{template.name}</p>
                   </button>
                 );
               })}
@@ -477,10 +484,14 @@ export function CollageDialog() {
           </div>
 
           {/* 中间：画布预览 */}
-          <div className="flex-1 p-8 flex items-center justify-center bg-[var(--md-sys-color-surface)]">
+          <div className="flex-1 p-10 flex items-center justify-center bg-[var(--bg-app)] relative overflow-hidden">
+             {/* 背景装饰 */}
+            <div className="absolute inset-0 opacity-20 pointer-events-none" 
+                 style={{ backgroundImage: 'radial-gradient(var(--border-strong) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+            
             <div
               ref={containerRef}
-              className="relative rounded-lg overflow-hidden shadow-xl ring-1 ring-black/10"
+              className="relative rounded-lg overflow-hidden shadow-2xl ring-1 ring-white/5"
               style={{
                 backgroundColor: bgColor,
                 aspectRatio: selectedTemplate.aspectRatio,
@@ -498,8 +509,8 @@ export function CollageDialog() {
                 <div
                   key={index}
                   className={cn(
-                    "absolute overflow-hidden transition-shadow",
-                    selectedIndex === index ? "ring-2 ring-[var(--md-sys-color-primary)] z-10" : ""
+                    "absolute overflow-hidden",
+                    selectedIndex === index ? "z-10" : ""
                   )}
                   style={{
                     left: `${layout.x}%`,
@@ -515,7 +526,8 @@ export function CollageDialog() {
                 >
                   <div
                     className={cn(
-                      "relative w-full h-full overflow-hidden group bg-[var(--md-sys-color-surface-container)]",
+                      "relative w-full h-full overflow-hidden group bg-[var(--bg-surface-hover)] transition-all border-2",
+                      selectedIndex === index ? "border-[var(--accent)] shadow-lg" : "border-transparent",
                       selectedTemplate.id === "free" ? "cursor-move" : ""
                     )}
                     style={{ borderRadius: borderRadius }}
@@ -533,16 +545,16 @@ export function CollageDialog() {
                           className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors"
                           onMouseDown={(e) => handleMouseDown(e, index, "move")}
                         >
-                          <Move className="w-6 h-6 text-white opacity-0 group-hover:opacity-70 transition-opacity" />
+                          <Move className="w-5 h-5 text-white opacity-0 group-hover:opacity-70 transition-opacity" />
                         </div>
                         <div
-                          className="absolute bottom-0 right-0 w-5 h-5 bg-[var(--md-sys-color-primary)] cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity rounded-tl"
+                          className="absolute bottom-0 right-0 w-4 h-4 bg-[var(--accent)] cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity rounded-tl"
                           onMouseDown={(e) => handleMouseDown(e, index, "resize")}
                         />
                       </>
                     )}
                     {/* 序号 */}
-                    <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-black/50 text-white text-xs font-medium flex items-center justify-center backdrop-blur-sm">
+                    <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/40 text-white text-[9px] font-bold backdrop-blur-md border border-white/10">
                       {index + 1}
                     </div>
                   </div>
@@ -552,10 +564,10 @@ export function CollageDialog() {
           </div>
 
           {/* 右侧：设置面板 */}
-          <div className="w-[240px] p-5 space-y-6 border-l border-[var(--md-sys-color-outline-variant)]/50 overflow-y-auto bg-[var(--md-sys-color-surface-container-low)]">
+          <div className="w-[260px] p-6 space-y-7 border-l border-[var(--border-subtle)] overflow-y-auto bg-[var(--bg-app)]/50">
             {/* 间距 */}
             <div>
-              <Slider label="图片间距" value={spacing} onChange={setSpacing} min={0} max={60} />
+              <Slider label="画面间距" value={spacing} onChange={setSpacing} min={0} max={60} />
             </div>
 
             {/* 圆角 */}
@@ -565,73 +577,82 @@ export function CollageDialog() {
 
             {/* 背景颜色 */}
             <div>
-              <label className="block text-sm font-medium text-[var(--md-sys-color-on-surface-variant)] mb-3">背景</label>
-              <div className="grid grid-cols-4 gap-2">
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-4 px-1">画布底色</label>
+              <div className="grid grid-cols-5 gap-2 px-1">
                 {BG_COLORS.map((color) => (
                   <button
                     key={color.value}
                     onClick={() => setBgColor(color.value)}
                     className={cn(
-                      "w-full aspect-square rounded-full border border-[var(--md-sys-color-outline-variant)] transition-all",
-                      bgColor === color.value ? "ring-2 ring-[var(--md-sys-color-primary)] ring-offset-2 ring-offset-[var(--md-sys-color-surface)]" : ""
+                      "w-full aspect-square rounded-lg border border-white/5 transition-all shadow-sm",
+                      bgColor === color.value ? "ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-app)]" : "hover:scale-110"
                     )}
                     style={{ backgroundColor: color.value }}
                     title={color.label}
                   />
                 ))}
               </div>
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-4 flex items-center gap-2 px-1">
                 <div className="relative flex-1">
                     <input
                     type="color"
                     value={bgColor}
                     onChange={(e) => setBgColor(e.target.value)}
-                    className="w-full h-8 rounded cursor-pointer opacity-0 absolute inset-0"
+                    className="w-full h-8 rounded cursor-pointer opacity-0 absolute inset-0 z-10"
                     />
-                    <div className="w-full h-8 rounded border border-[var(--md-sys-color-outline-variant)] flex items-center justify-center text-xs text-[var(--md-sys-color-on-surface-variant)] bg-[var(--md-sys-color-surface)]">
-                        自定义颜色
+                    <div className="w-full h-8 rounded-lg border border-[var(--border-subtle)] flex items-center justify-center text-[10px] font-bold text-[var(--text-secondary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)] transition-colors">
+                        自定义色值
                     </div>
                 </div>
               </div>
             </div>
 
             {/* 当前模板信息 */}
-            <div className="p-4 rounded-xl bg-[var(--md-sys-color-surface-container)] border border-[var(--md-sys-color-outline-variant)]/30">
-              <div className="flex items-center gap-2 mb-2">
-                <LayoutGrid className="w-4 h-4 text-[var(--md-sys-color-primary)]" />
-                <span className="text-sm font-medium text-[var(--md-sys-color-on-surface)]">{selectedTemplate.name}</span>
+            <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+              <div className="flex items-center gap-2 mb-2.5">
+                <LayoutGrid className="w-4 h-4 text-[var(--accent)]" />
+                <span className="text-xs font-bold text-[var(--text-primary)]">{selectedTemplate.name}</span>
               </div>
-              <p className="text-xs text-[var(--md-sys-color-on-surface-variant)]">
-                比例: {selectedTemplate.aspectRatio >= 1
-                  ? `${Math.round(selectedTemplate.aspectRatio * 3)}:3`
-                  : `3:${Math.round(3 / selectedTemplate.aspectRatio)}`}
-              </p>
+              <div className="flex items-center justify-between text-[10px] font-medium text-[var(--text-muted)]">
+                <span>比例</span>
+                <span className="font-mono text-[var(--text-secondary)]">
+                  {selectedTemplate.aspectRatio >= 1
+                    ? `${Math.round(selectedTemplate.aspectRatio * 3)}:3`
+                    : `3:${Math.round(3 / selectedTemplate.aspectRatio)}`}
+                </span>
+              </div>
               {selectedTemplate.id === "free" && (
-                <p className="text-xs text-[var(--md-sys-color-primary)] mt-2">拖拽图片调整位置和大小</p>
+                <p className="text-[10px] text-[var(--accent)] mt-3 font-bold bg-[var(--accent-surface)] px-2 py-1 rounded">自由模式：支持拖拽交互</p>
               )}
             </div>
 
-            {error && <p className="text-[var(--md-sys-color-error)] text-xs">{error}</p>}
+            {error && <div className="text-[var(--status-error)] text-[11px] font-medium bg-[var(--status-error)]/10 p-2.5 rounded border border-[var(--status-error)]/20">{error}</div>}
           </div>
         </div>
 
-        {/* 底部按钮 */}
-        <div className="flex items-center justify-end gap-3 p-6 pt-4 border-t border-[var(--md-sys-color-outline-variant)]/50 bg-[var(--md-sys-color-surface-container)]">
-          <Button variant="ghost" onClick={closeDialog} disabled={isProcessing}>
+        {/* Footer */}
+        <div className="p-6 border-t border-[var(--border-subtle)] flex items-center justify-end gap-4 bg-[var(--bg-app)]/50">
+          <Button 
+            variant="ghost" 
+            onClick={closeDialog} 
+            disabled={isProcessing}
+            className="px-6"
+          >
             取消
           </Button>
           <Button
             variant="primary"
             onClick={handleExecute}
             disabled={isProcessing || files.length < 2}
+            className="min-w-[160px] shadow-lg shadow-[var(--accent)]/20"
           >
             {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                生成中...
-              </>
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>生成中...</span>
+              </div>
             ) : (
-              "保存拼图"
+              "导出拼图"
             )}
           </Button>
         </div>
@@ -645,20 +666,20 @@ function TemplatePreview({ template, count }: { template: CollageTemplate; count
   const layouts = template.getLayout().slice(0, count);
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full opacity-60">
       {layouts.map((layout, index) => (
         <div
           key={index}
-          className="absolute bg-[var(--md-sys-color-surface-container-high)] rounded-[2px]"
+          className="absolute bg-white/20 rounded-[1px]"
           style={{
             left: `${layout.x}%`,
             top: `${layout.y}%`,
             width: `${layout.width}%`,
             height: `${layout.height}%`,
-            padding: 1,
+            padding: 0.5,
           }}
         >
-          <div className="w-full h-full bg-[var(--md-sys-color-on-surface-variant)]/30 rounded-[1px]" />
+          <div className="w-full h-full bg-white/10 rounded-[1px]" />
         </div>
       ))}
     </div>

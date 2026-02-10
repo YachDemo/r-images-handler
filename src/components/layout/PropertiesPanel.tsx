@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useFileStore } from "../../stores/fileStore";
-import { Info, Calendar, HardDrive, Maximize2, FileType, Loader2, Grid3X3, Image as ImageIcon } from "lucide-react";
+import { Info, Calendar, HardDrive, Maximize2, FileType, Loader2, Grid3X3, Image as ImageIcon, BarChart3, Palette, Tag, Camera, Aperture, Clock, MapPin } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useBatchStore } from "../../stores/batchStore";
 import { Button } from "../ui/Button";
+import { cn } from "../../utils/cn";
 
-export function PropertiesPanel({ width }: { width: number }) {
+export function PropertiesPanel() {
   const { selectedPaths } = useSelectionStore();
   const { images } = useFileStore();
   const { openCollageDialog } = useBatchStore();
@@ -34,168 +35,222 @@ export function PropertiesPanel({ width }: { width: number }) {
   };
 
   return (
-    <aside 
-      style={{ width }} 
-      className="bg-[var(--bg-surface)] flex flex-col h-full overflow-hidden flex-shrink-0 border-l border-[var(--border-subtle)]"
-    >
-      {/* 标题 */}
-      <div className="h-[var(--toolbar-height)] px-6 flex items-center border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/50 backdrop-blur-md">
-        <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em] select-none">
-          属性详情
+    <div className="flex flex-col h-full bg-[var(--bg-surface)]">
+      {/* 标题栏 */}
+      <div className="h-[var(--toolbar-height)] px-4 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/80 backdrop-blur-md sticky top-0 z-10">
+        <span className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em] select-none">
+          属性检查器
+        </span>
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-[var(--bg-surface-active)] text-[var(--text-muted)]">
+           {selectedImages.length} 选中
         </span>
       </div>
 
-      {/* 属性内容 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      {/* 属性内容滚动区 */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
         {selectedImage ? (
-          <div className="animate-fade-in p-6 space-y-8">
-            {/* 预览图卡片 */}
-            <div className="space-y-3">
-              <div className="aspect-video w-full rounded-xl bg-[var(--bg-app)] border border-[var(--border-strong)] overflow-hidden relative flex items-center justify-center group shadow-2xl shadow-black/40">
-                {!imageLoaded && (
+          <>
+            {/* 1. 预览卡片 */}
+            <PropertyCard className="overflow-hidden p-0 border-0 bg-[var(--bg-app)]">
+              <div className="aspect-video w-full bg-[var(--bg-app)] relative flex items-center justify-center group">
+                 {!imageLoaded && (
                   <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-surface)]">
                     <Loader2 className="w-5 h-5 text-[var(--accent)] animate-spin" />
                   </div>
                 )}
-                {/* 棋盘格背景 (Refined) */}
-                <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+                {/* 棋盘格背景 */}
+                <div className="absolute inset-0 opacity-[0.05] pointer-events-none" 
                      style={{ backgroundImage: 'conic-gradient(#fff 0.25turn, transparent 0.25turn 0.5turn, #fff 0.5turn 0.75turn, transparent 0.75turn)', backgroundSize: '16px 16px' }}>
                 </div>
                 <img
                   src={imageSrc || ""}
                   alt={selectedImage.name}
-                  className={`max-w-full max-h-full object-contain transition-all duration-500 ease-out z-10 ${imageLoaded ? "opacity-100 scale-100" : "opacity-0 scale-95 blur-sm"}`}
+                  className={cn(
+                    "max-w-full max-h-full object-contain transition-all duration-500 ease-out z-10",
+                    imageLoaded ? "opacity-100 scale-100" : "opacity-0 scale-95 blur-sm"
+                  )}
                   onLoad={() => setImageLoaded(true)}
                 />
+                
+                {/* 悬浮信息 */}
+                <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[10px] text-white/90 font-mono opacity-0 group-hover:opacity-100 transition-opacity">
+                  {selectedImage.width} × {selectedImage.height}
+                </div>
               </div>
-              <div className="px-1 flex items-center justify-between text-[10px] text-[var(--text-muted)] font-mono">
-                <span>PREVIEW</span>
-                <span>{selectedImage.width} × {selectedImage.height}</span>
-              </div>
-            </div>
+            </PropertyCard>
 
-            {/* 文件基本信息 */}
-            <section className="space-y-4">
-              <div className="space-y-1.5">
-                <h3 className="text-[var(--text-primary)] text-sm font-semibold break-words leading-relaxed select-all" title={selectedImage.name}>
-                  {selectedImage.name}
-                </h3>
-                <p className="text-[11px] text-[var(--text-muted)] font-mono break-all leading-tight opacity-70" title={selectedImage.path}>
-                  {selectedImage.path}
-                </p>
+            {/* 2. 基本信息卡片 */}
+            <PropertyCard title="基本信息" icon={Info}>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">文件名</label>
+                  <p className="text-sm font-medium text-[var(--text-primary)] break-words select-all leading-snug">
+                    {selectedImage.name}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">路径</label>
+                  <p className="text-[10px] font-mono text-[var(--text-secondary)] break-all leading-tight opacity-80 select-all p-2 rounded bg-[var(--bg-app)] border border-[var(--border-subtle)]">
+                    {selectedImage.path}
+                  </p>
+                </div>
+                 <div className="grid grid-cols-2 gap-2 pt-1">
+                   <InfoBadge icon={FileType} label={selectedImage.extension.toUpperCase()} />
+                   <InfoBadge icon={HardDrive} label={selectedImage.sizeFormatted} />
+                 </div>
               </div>
+            </PropertyCard>
 
-              <div className="pt-4 border-t border-[var(--border-subtle)] space-y-4">
-                <InfoSection title="文件详情">
-                  <InfoRow icon={Maximize2} label="分辨率" value={`${selectedImage.width} × ${selectedImage.height}`} />
-                  <InfoRow icon={HardDrive} label="文件大小" value={selectedImage.sizeFormatted} />
-                  <InfoRow icon={FileType} label="文件格式" value={selectedImage.extension.toUpperCase()} />
-                  <InfoRow icon={Calendar} label="修改日期" value={selectedImage.modifiedFormatted} />
-                </InfoSection>
+            {/* 3. 图像分析卡片 (模拟) */}
+            <PropertyCard title="图像分析" icon={BarChart3}>
+               <div className="flex flex-col gap-4">
+                  {/* 模拟直方图 */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+                      <span>RGB 直方图</span>
+                      <span>ISO 200</span>
+                    </div>
+                    <div className="h-16 flex items-end gap-[1px] opacity-80">
+                      {[...Array(20)].map((_, i) => (
+                        <div key={i} className="flex-1 bg-[var(--accent)]/30 rounded-t-[1px]" style={{ height: `${Math.random() * 80 + 20}%` }} />
+                      ))}
+                      {[...Array(20)].map((_, i) => (
+                         <div key={`g-${i}`} className="flex-1 bg-green-500/30 rounded-t-[1px]" style={{ height: `${Math.random() * 80 + 20}%` }} />
+                      ))}
+                      {[...Array(20)].map((_, i) => (
+                         <div key={`b-${i}`} className="flex-1 bg-blue-500/30 rounded-t-[1px]" style={{ height: `${Math.random() * 80 + 20}%` }} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 模拟色板 */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+                       <Palette className="w-3 h-3" />
+                       <span>主色调</span>
+                    </div>
+                    <div className="flex gap-2">
+                       {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1'].map(color => (
+                         <div key={color} className="h-6 flex-1 rounded-md shadow-sm ring-1 ring-inset ring-black/10" style={{ backgroundColor: color }} />
+                       ))}
+                    </div>
+                  </div>
+               </div>
+            </PropertyCard>
+
+             {/* 4. 元数据卡片 (模拟) */}
+            <PropertyCard title="拍摄信息" icon={Camera}>
+              <div className="grid grid-cols-2 gap-y-3 gap-x-2">
+                 <InfoRow icon={Camera} label="设备" value="Sony A7M4" />
+                 <InfoRow icon={Aperture} label="光圈" value="f/2.8" />
+                 <InfoRow icon={Maximize2} label="焦距" value="24mm" />
+                 <InfoRow icon={Clock} label="曝光" value="1/200s" />
+                 <InfoRow icon={MapPin} label="位置" value="未记录" />
+                 <InfoRow icon={Calendar} label="时间" value={selectedImage.modifiedFormatted} fullWidth />
               </div>
-            </section>
-          </div>
+            </PropertyCard>
+
+             {/* 5. 标签管理 (模拟) */}
+             <PropertyCard title="标签" icon={Tag}>
+                <div className="flex flex-wrap gap-2">
+                   <div className="px-2 py-1 rounded-md bg-[var(--accent-surface)] border border-[var(--accent-glow)] text-[var(--accent)] text-xs font-medium">风景</div>
+                   <div className="px-2 py-1 rounded-md bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs hover:border-[var(--text-muted)] cursor-pointer transition-colors">RAW</div>
+                   <div className="px-2 py-1 rounded-md bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs hover:border-[var(--text-muted)] cursor-pointer transition-colors">+ 添加</div>
+                </div>
+             </PropertyCard>
+
+          </>
         ) : selectedImages.length > 1 ? (
-          <div className="animate-fade-in p-6 space-y-8">
-            {/* 多图预览堆叠效果 */}
-            <div className="grid grid-cols-3 gap-2 p-2 bg-[var(--bg-app)]/30 rounded-xl border border-[var(--border-subtle)] shadow-inner">
-              {selectedImages.slice(0, 9).map((img) => (
-                <div
-                  key={img.path}
-                  className="aspect-square rounded-lg bg-[var(--bg-surface)] overflow-hidden border border-[var(--border-subtle)] shadow-sm hover:border-[var(--accent)]/50 transition-colors"
-                >
-                  <img
-                    src={convertFileSrc(img.path)}
-                    alt={img.name}
-                    className="w-full h-full object-cover opacity-90"
-                  />
-                </div>
-              ))}
-              {selectedImages.length > 9 && (
-                <div className="aspect-square rounded-lg bg-[var(--bg-surface-active)] flex items-center justify-center border border-[var(--border-subtle)] border-dashed">
-                  <span className="text-xs font-bold text-[var(--text-secondary)]">+{selectedImages.length - 9}</span>
-                </div>
-              )}
-            </div>
-
-            <section className="space-y-6">
-              <div className="space-y-1">
-                <h3 className="text-[var(--text-primary)] font-semibold text-sm leading-tight">
-                  已选择 {selectedImages.length} 个资源
-                </h3>
-                <p className="text-[11px] text-[var(--text-muted)]">批量操作就绪</p>
-              </div>
-
-              <div className="pt-4 border-t border-[var(--border-subtle)]">
-                <InfoSection title="统计详情">
-                  <InfoRow icon={HardDrive} label="总占用" value={formatSize(totalSize)} />
-                  <InfoRow 
-                    icon={FileType} 
-                    label="包含格式" 
-                    value={[...new Set(selectedImages.map(i => i.extension.toUpperCase()))].slice(0, 3).join(", ") + (new Set(selectedImages.map(i => i.extension)).size > 3 ? "..." : "")} 
-                  />
-                </InfoSection>
-              </div>
-
-              {selectedImages.length >= 2 && (
-                <div className="pt-4">
-                  <Button
-                    variant="primary"
-                    className="w-full h-10 text-xs font-bold uppercase tracking-widest shadow-lg shadow-indigo-500/20"
-                    onClick={openCollageDialog}
-                  >
-                    <Grid3X3 className="w-3.5 h-3.5 mr-2" />
-                    创建图片拼图
+          <>
+            <PropertyCard title="多选概览" icon={Grid3X3}>
+               <div className="flex flex-col gap-4">
+                 <div className="grid grid-cols-4 gap-2">
+                    {selectedImages.slice(0, 8).map((img) => (
+                      <div key={img.path} className="aspect-square rounded bg-[var(--bg-app)] overflow-hidden border border-[var(--border-subtle)]">
+                        <img src={convertFileSrc(img.path)} className="w-full h-full object-cover opacity-80" />
+                      </div>
+                    ))}
+                 </div>
+                 <div className="p-3 rounded-lg bg-[var(--bg-app)] border border-[var(--border-subtle)] flex flex-col gap-2">
+                    <div className="flex justify-between text-xs">
+                       <span className="text-[var(--text-muted)]">已选数量</span>
+                       <span className="text-[var(--text-primary)] font-bold">{selectedImages.length} 张</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                       <span className="text-[var(--text-muted)]">总大小</span>
+                       <span className="text-[var(--text-primary)] font-mono">{formatSize(totalSize)}</span>
+                    </div>
+                 </div>
+               </div>
+            </PropertyCard>
+            
+            <PropertyCard title="批量操作" icon={BarChart3}>
+               <div className="flex flex-col gap-3">
+                  <Button variant="primary" className="w-full justify-start" onClick={openCollageDialog}>
+                     <Grid3X3 className="w-4 h-4 mr-2" />
+                     创建拼图
                   </Button>
-                </div>
-              )}
-            </section>
-          </div>
+                  <Button variant="ghost" className="w-full justify-start border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-active)]">
+                     <Tag className="w-4 h-4 mr-2" />
+                     批量添加标签
+                  </Button>
+               </div>
+            </PropertyCard>
+          </>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] animate-fade-in p-10 text-center space-y-5">
-            <div className="w-16 h-16 rounded-2xl bg-[var(--bg-surface-hover)] flex items-center justify-center shadow-inner border border-[var(--border-subtle)]">
-              <ImageIcon className="w-8 h-8 opacity-20" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-[var(--text-secondary)]">未选中任何内容</p>
-              <p className="text-[11px] opacity-50 max-w-[160px] leading-relaxed">在图库中点击一张或多张图片来查看其属性和操作</p>
-            </div>
+          <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] text-center gap-4 opacity-60">
+             <div className="p-4 rounded-full bg-[var(--bg-app)] border border-[var(--border-subtle)]">
+               <ImageIcon className="w-8 h-8" />
+             </div>
+             <p className="text-sm">选择图片查看详情</p>
           </div>
         )}
       </div>
-    </aside>
-  );
-}
-
-function InfoSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-4">
-      <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-[0.15em] mb-1">
-        {title}
-      </h4>
-      <div className="space-y-3 px-1">{children}</div>
     </div>
   );
 }
 
-function InfoRow({
+function PropertyCard({ 
+  children, 
+  title, 
   icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
+  className 
+}: { 
+  children: React.ReactNode; 
+  title?: string; 
+  icon?: React.ElementType;
+  className?: string;
 }) {
   return (
-    <div className="flex items-center justify-between text-[11px] group">
-      <div className="flex items-center gap-2.5 text-[var(--text-secondary)] flex-shrink-0">
-        <Icon className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-        <span className="font-medium">{label}</span>
+    <div className={cn("w-full bg-[var(--bg-surface-hover)]/30 border border-[var(--border-subtle)] rounded-xl p-4 shadow-sm transition-all hover:border-[var(--border-strong)] flex flex-col gap-3", className)}>
+      {title && (
+        <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-subtle)]/50">
+          {Icon && <Icon className="w-4 h-4 text-[var(--text-muted)]" />}
+          <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{title}</span>
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function InfoBadge({ icon: Icon, label }: { icon: any, label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-[var(--bg-app)] border border-[var(--border-subtle)]">
+      <Icon className="w-3 h-3 text-[var(--text-secondary)]" />
+      <span className="text-[10px] font-mono text-[var(--text-secondary)]">{label}</span>
+    </div>
+  );
+}
+
+function InfoRow({ icon: Icon, label, value, fullWidth = false }: { icon: any, label: string, value: string, fullWidth?: boolean }) {
+  return (
+    <div className={cn("flex items-start gap-3 py-1", fullWidth ? "col-span-2" : "")}>
+      <Icon className="w-4 h-4 text-[var(--text-muted)] mt-0.5 shrink-0" />
+      <div className="flex flex-col gap-0.5 min-w-0">
+         <span className="text-[10px] text-[var(--text-muted)] leading-none">{label}</span>
+         <span className="text-[12px] text-[var(--text-primary)] font-medium leading-tight break-words">{value}</span>
       </div>
-      <span className="text-[var(--text-primary)] truncate max-w-[140px] text-right font-mono select-all font-medium opacity-90" title={value}>
-        {value}
-      </span>
     </div>
   );
 }

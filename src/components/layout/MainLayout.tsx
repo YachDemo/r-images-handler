@@ -62,48 +62,36 @@ export function MainLayout() {
   }, [propertiesWidth]);
 
   return (
-    <div className={`h-screen w-screen flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)] overflow-hidden p-2 gap-2 ${(isResizingSidebar || isResizingProperties) ? "select-none" : ""}`}>
+    <div className={`h-screen w-full flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)] overflow-hidden p-4 gap-4 ${(isResizingSidebar || isResizingProperties) ? "select-none" : ""}`}>
       {/* 顶部工具栏 */}
-      <div className="rounded-xl overflow-hidden border border-[var(--border-subtle)] shrink-0 shadow-sm bg-[var(--bg-surface)]">
+      <div className="rounded-[var(--radius)] overflow-hidden border border-[var(--border-subtle)] shrink-0 shadow-md bg-[var(--bg-surface)]">
         <Toolbar />
       </div>
 
       {/* 主体区域 */}
-      <div className="flex-1 flex overflow-hidden gap-2">
-        {/* 左侧文件夹树 - 增加 px-1 确保内容不贴边 */}
-        <div className="rounded-xl overflow-hidden border border-[var(--border-subtle)] flex flex-col shrink-0 shadow-sm bg-[var(--bg-surface)]" style={{ width: sidebarWidth }}>
-          <div className="flex-1 overflow-hidden px-1">
-            <Sidebar width={sidebarWidth - 8} />
+      <div className="flex-1 flex overflow-hidden gap-4">
+        {/* 左侧文件夹树 */}
+        <div className="rounded-[var(--radius)] overflow-hidden border border-[var(--border-subtle)] flex flex-col shrink-0 bg-[var(--bg-surface)] shadow-md" style={{ width: sidebarWidth }}>
+          <div className="flex-1 overflow-hidden p-[var(--panel-padding)]">
+            <Sidebar width={sidebarWidth - (16 * 2)} />
           </div>
         </div>
 
-        {/* 侧边栏调整手柄 */}
-        <div
-          className={`w-1 cursor-col-resize z-10 hover:bg-[var(--accent)]/30 transition-colors rounded-full ${isResizingSidebar ? 'bg-[var(--accent)]/50' : ''}`}
-          onMouseDown={handleSidebarMouseDown}
-        />
-
         {/* 中央内容区 */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-app)] rounded-xl overflow-hidden border border-[var(--border-subtle)] shadow-sm">
+        <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-surface)] rounded-[var(--radius)] overflow-hidden border border-[var(--border-subtle)] shadow-md">
             <MainContent />
         </div>
 
-        {/* 属性面板调整手柄 */}
-        <div
-          className={`w-1 cursor-col-resize z-10 hover:bg-[var(--accent)]/30 transition-colors rounded-full ${isResizingProperties ? 'bg-[var(--accent)]/50' : ''}`}
-          onMouseDown={handlePropertiesMouseDown}
-        />
-
-        {/* 右侧属性面板 - 增加 px-1 确保内容不贴边 */}
-        <div className="rounded-xl overflow-hidden border border-[var(--border-subtle)] flex flex-col shrink-0 shadow-sm bg-[var(--bg-surface)]" style={{ width: propertiesWidth }}>
-          <div className="flex-1 overflow-hidden px-1">
-            <PropertiesPanel width={propertiesWidth - 8} />
+        {/* 右侧属性面板 */}
+        <div className="rounded-[var(--radius)] overflow-hidden border border-[var(--border-subtle)] flex flex-col shrink-0 bg-[var(--bg-surface)] shadow-md" style={{ width: propertiesWidth }}>
+          <div className="flex-1 overflow-hidden">
+            <PropertiesPanel />
           </div>
         </div>
       </div>
 
       {/* 底部状态栏 */}
-      <div className="rounded-xl overflow-hidden border border-[var(--border-subtle)] shrink-0 shadow-sm bg-[var(--bg-surface)]">
+      <div className="rounded-[var(--radius)] overflow-hidden border border-[var(--border-subtle)] shrink-0 bg-[var(--bg-surface)] shadow-sm">
         <StatusBar />
       </div>
     </div>

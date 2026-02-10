@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { X, Maximize2, Loader2, Link, Unlink } from "lucide-react";
+import { useState, useMemo } from "react";
+import { X, Maximize2, Link, Unlink, FolderOpen, ArrowRight, CheckCircle2, Scan } from "lucide-react";
 import { Button } from "../ui/Button";
 import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
@@ -8,17 +8,16 @@ import { batchResize, selectFolder, listImages } from "../../services/tauriApi";
 import { cn } from "../../utils/cn";
 
 const PRESETS = [
-  { label: "HD (1280)", width: 1280, height: null },
-  { label: "Full HD (1920)", width: 1920, height: null },
-  { label: "4K (3840)", width: 3840, height: null },
-  { label: "缩略图 (256)", width: 256, height: null },
-  { label: "社交媒体 (1080)", width: 1080, height: 1080 },
+  { label: "1920 Full HD", width: 1920, height: null, desc: "标准高清屏" },
+  { label: "1280 HD", width: 1280, height: null, desc: "普通显示屏" },
+  { label: "3840 4K", width: 3840, height: null, desc: "超高清分辨率" },
+  { label: "1080 Insta", width: 1080, height: 1080, desc: "社交媒体方图" },
 ];
 
 export function BatchResizeDialog() {
   const { activeDialog, closeDialog, isProcessing, setProcessing } = useBatchStore();
   const { selectedPaths, clearSelection } = useSelectionStore();
-  const { rootPaths, setImages } = useFileStore();
+  const { rootPaths, setImages, images } = useFileStore();
 
   const [width, setWidth] = useState<number | null>(1920);
   const [height, setHeight] = useState<number | null>(null);
@@ -28,6 +27,50 @@ export function BatchResizeDialog() {
 
   const files = Array.from(selectedPaths);
   const isOpen = activeDialog === "resize";
+
+  // 获取第一个选中的图片用于预览
+  const firstSelectedImage = useMemo(() => {
+    return images.find(img => selectedPaths.has(img.path));
+  }, [images, selectedPaths]);
+
+  // 计算预览尺寸
+  const previewDims = useMemo(() => {
+    if (!firstSelectedImage) return null;
+    
+    const originalW = firstSelectedImage.width;
+    const originalH = firstSelectedImage.height;
+    
+    let newW = width;
+    let newH = height;
+
+    if (maintainAspect) {
+      const aspect = originalW / originalH;
+      
+      if (width && !height) {
+        // 只设置了宽度
+        newH = Math.round(width / aspect);
+      } else if (!width && height) {
+        // 只设置了高度
+        newW = Math.round(height * aspect);
+      } else if (width && height) {
+        // 都设置了，采取 "Fit Inside" 逻辑 (类似 object-contain)
+        // 这样可以保证不超过任一边界
+        const scaleW = width / originalW;
+        const scaleH = height / originalH;
+        const scale = Math.min(scaleW, scaleH);
+        newW = Math.round(originalW * scale);
+        newH = Math.round(originalH * scale);
+      }
+    }
+
+    // 如果都没有设置，或者只设置了一个且没开启保持比例（未设置的为null? 
+    // 后端通常逻辑：未设置则保持原样，或者如果maintainAspect=false则可能拉伸？
+    // 这里假设未设置的维度保持原样
+    if (newW === null) newW = originalW;
+    if (newH === null) newH = originalH;
+
+    return { w: newW, h: newH };
+  }, [width, height, maintainAspect, firstSelectedImage]);
 
   const handleSelectOutputDir = async () => {
     try {
@@ -60,7 +103,6 @@ export function BatchResizeDialog() {
         outputDir || undefined
       );
 
-      // 刷新所有受影响的图片列表
       const allNewImages: ImageFileInfo[] = [];
       for (const path of rootPaths) {
         try {
@@ -71,7 +113,6 @@ export function BatchResizeDialog() {
         }
       }
       
-      // 去重合并
       const uniqueImages: ImageFileInfo[] = [];
       const seen = new Set();
       allNewImages.forEach(img => {
@@ -84,6 +125,7 @@ export function BatchResizeDialog() {
 
       clearSelection();
       closeDialog();
+      // eslint-disable-next-line no-alert
       alert(`成功调整 ${count} 个文件尺寸`);
     } catch (err) {
       setError(String(err));
@@ -96,145 +138,202 @@ export function BatchResizeDialog() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-[500px] bg-[var(--md-sys-color-surface-container)] rounded-[28px] border border-[var(--md-sys-color-outline-variant)]/50 shadow-2xl flex flex-col overflow-hidden">
-        {/* 头部 */}
-        <div className="flex items-center justify-between p-6 pb-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-[var(--md-sys-color-secondary-container)] flex items-center justify-center">
-              <Maximize2 className="w-5 h-5 text-[var(--md-sys-color-on-secondary-container)]" />
+      <div className="relative w-full max-w-2xl bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-strong)] shadow-2xl flex flex-col animate-slide-in overflow-hidden max-h-[90vh]">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/50 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20">
+              <Maximize2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-[var(--md-sys-color-on-surface)]">批量调整尺寸</h2>
-              <p className="text-sm text-[var(--md-sys-color-on-surface-variant)]">已选择 {files.length} 个文件</p>
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">批量调整尺寸</h2>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                已选中 {files.length} 个文件
+              </p>
             </div>
           </div>
           <button
             onClick={closeDialog}
-            className="p-2 rounded-full hover:bg-[var(--md-sys-color-on-surface)]/10 text-[var(--md-sys-color-on-surface-variant)] hover:text-[var(--md-sys-color-on-surface)] transition-colors"
+            className="w-8 h-8 rounded-lg hover:bg-[var(--bg-surface-hover)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* 设置区域 */}
-        <div className="p-6 pt-2 space-y-6">
-          {/* 预设 */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--md-sys-color-on-surface-variant)] mb-3">
-              快速预设
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() => handlePresetClick(preset)}
-                  className={cn(
-                    "px-4 py-2 rounded-full text-sm font-medium transition-all ripple",
-                    width === preset.width && height === preset.height
-                      ? "bg-[var(--md-sys-color-primary)] text-[var(--md-sys-color-on-primary)]"
-                      : "bg-[var(--md-sys-color-surface-container-highest)] text-[var(--md-sys-color-on-surface-variant)] hover:bg-[var(--md-sys-color-on-surface)]/10 hover:text-[var(--md-sys-color-on-surface)]"
-                  )}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 尺寸输入 */}
-          <div className="bg-[var(--md-sys-color-surface-container-high)] p-5 rounded-2xl">
-            <label className="block text-sm font-medium text-[var(--md-sys-color-primary)] mb-4">
-              自定义尺寸
-            </label>
-            <div className="flex items-end gap-4">
-              <div className="flex-1">
-                <label className="block text-xs text-[var(--md-sys-color-on-surface-variant)] mb-2 px-1">宽度 (px)</label>
-                <input
-                  type="number"
-                  value={width ?? ""}
-                  onChange={(e) => setWidth(e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="自动"
-                  className="w-full h-12 px-5 rounded-lg bg-[var(--md-sys-color-surface-container-highest)] border border-transparent text-[var(--md-sys-color-on-surface)] placeholder-[var(--md-sys-color-on-surface-variant)] focus:outline-none focus:border-[var(--md-sys-color-primary)] focus:ring-1 focus:ring-[var(--md-sys-color-primary)] transition-all"
-                />
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Left Column: Presets */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[var(--bg-surface-active)] text-[10px] font-bold text-[var(--text-secondary)]">1</span>
+                 <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">常用预设</h3>
               </div>
-
-              <button
-                onClick={() => setMaintainAspect(!maintainAspect)}
-                className={cn(
-                  "h-12 w-12 flex items-center justify-center rounded-xl transition-all ripple",
-                  maintainAspect
-                    ? "bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]"
-                    : "bg-[var(--md-sys-color-surface-container-highest)] text-[var(--md-sys-color-on-surface-variant)]"
-                )}
-                title={maintainAspect ? "保持比例" : "不保持比例"}
-              >
-                {maintainAspect ? (
-                  <Link className="w-5 h-5" />
-                ) : (
-                  <Unlink className="w-5 h-5" />
-                )}
-              </button>
-
-              <div className="flex-1">
-                <label className="block text-xs text-[var(--md-sys-color-on-surface-variant)] mb-2 px-1">高度 (px)</label>
-                <input
-                  type="number"
-                  value={height ?? ""}
-                  onChange={(e) => setHeight(e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="自动"
-                  className="w-full h-12 px-5 rounded-lg bg-[var(--md-sys-color-surface-container-highest)] border border-transparent text-[var(--md-sys-color-on-surface)] placeholder-[var(--md-sys-color-on-surface-variant)] focus:outline-none focus:border-[var(--md-sys-color-primary)] focus:ring-1 focus:ring-[var(--md-sys-color-primary)] transition-all"
-                  disabled={maintainAspect}
-                />
+              
+              <div className="grid grid-cols-1 gap-2">
+                {PRESETS.map((preset) => {
+                  const isActive = width === preset.width && height === preset.height;
+                  return (
+                    <button
+                      key={preset.label}
+                      onClick={() => handlePresetClick(preset)}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-3 rounded-xl border transition-all text-left group",
+                        isActive
+                          ? "bg-[var(--accent)]/10 border-[var(--accent)]/50 shadow-sm"
+                          : "bg-[var(--bg-app)] border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-hover)]"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
+                        isActive ? "border-[var(--accent)] bg-[var(--accent)]" : "border-[var(--text-muted)] opacity-50"
+                      )}>
+                        {isActive && <CheckCircle2 className="w-3 h-3 text-white" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <span className={cn(
+                            "text-sm font-bold block",
+                            isActive ? "text-[var(--accent)]" : "text-[var(--text-primary)]"
+                          )}>
+                            {preset.label}
+                          </span>
+                         <span className="text-[10px] text-[var(--text-muted)]">{preset.desc}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <p className="mt-4 text-xs text-[var(--md-sys-color-on-surface-variant)] flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--md-sys-color-primary)]"></span>
-              {maintainAspect
-                ? "保持比例模式：图片将按比例缩放至边界内"
-                : "自由模式：图片将强制拉伸至设定尺寸"}
-            </p>
-          </div>
 
-          {/* 输出目录 */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--md-sys-color-on-surface-variant)] mb-3">
-              输出路径
-            </label>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-12 px-5 rounded-lg bg-[var(--md-sys-color-surface-container-highest)] border border-transparent flex items-center overflow-hidden">
-                <span className="text-sm text-[var(--md-sys-color-on-surface-variant)] truncate">
-                  {outputDir || "覆盖原文件"}
-                </span>
+            {/* Right Column: Custom Settings */}
+            <div className="space-y-6">
+              
+              {/* Custom Size */}
+              <div className="space-y-4">
+                 <div className="flex items-center gap-2 mb-1">
+                   <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[var(--bg-surface-active)] text-[10px] font-bold text-[var(--text-secondary)]">2</span>
+                   <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">自定义规格</h3>
+                 </div>
+
+                 <div className="bg-[var(--bg-app)] rounded-xl border border-[var(--border-subtle)] p-5 space-y-4">
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-[9px] font-bold text-[var(--text-muted)] uppercase px-1">宽度 (px)</label>
+                        <input
+                          type="number"
+                          value={width ?? ""}
+                          onChange={(e) => setWidth(e.target.value ? parseInt(e.target.value) : null)}
+                          placeholder="自动"
+                          className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-all font-mono"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                        <label className="text-[9px] font-bold text-[var(--text-muted)] uppercase px-1">高度 (px)</label>
+                        <input
+                          type="number"
+                          value={height ?? ""}
+                          onChange={(e) => setHeight(e.target.value ? parseInt(e.target.value) : null)}
+                          placeholder="自动"
+                          className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-all font-mono"
+                          disabled={maintainAspect}
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setMaintainAspect(!maintainAspect)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-all",
+                        maintainAspect
+                          ? "bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]"
+                          : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        {maintainAspect ? <Link className="w-3.5 h-3.5" /> : <Unlink className="w-3.5 h-3.5" />}
+                        <span className="text-xs font-medium">{maintainAspect ? "保持纵横比" : "自由调整 (可能变形)"}</span>
+                      </div>
+                    </button>
+                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={handleSelectOutputDir}>
-                选择目录
-              </Button>
+
+              {/* Preview Block */}
+              {firstSelectedImage && previewDims && (
+                <div className="space-y-4">
+                   <div className="flex items-center gap-2 mb-1">
+                     <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[var(--bg-surface-active)] text-[10px] font-bold text-[var(--text-secondary)]">3</span>
+                     <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">效果预览</h3>
+                   </div>
+                   
+                   <div className="bg-[var(--bg-app)] rounded-xl border border-[var(--border-subtle)] p-4 flex items-center gap-4">
+                     <div className="flex flex-col items-center gap-1 min-w-[60px]">
+                        <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">原始</span>
+                        <div className="text-xs font-mono text-[var(--text-secondary)]">{firstSelectedImage.width} x {firstSelectedImage.height}</div>
+                     </div>
+                     
+                     <div className="flex-1 flex justify-center">
+                        <ArrowRight className="w-4 h-4 text-[var(--accent)]" />
+                     </div>
+                     
+                     <div className="flex flex-col items-center gap-1 min-w-[60px]">
+                        <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">新尺寸</span>
+                        <div className="text-xs font-mono font-bold text-[var(--text-primary)]">
+                          {previewDims.w} x {previewDims.h}
+                        </div>
+                     </div>
+                   </div>
+                   <div className="text-[10px] text-[var(--text-muted)] text-center px-2">
+                     * 预览基于选中的第一张图片: <span className="text-[var(--text-secondary)] truncate max-w-[150px] inline-block align-bottom">{firstSelectedImage.name}</span>
+                   </div>
+                </div>
+              )}
+
+              {/* Output Path */}
+              <div className="space-y-4">
+                 <div className="flex items-center gap-2 mb-1">
+                   <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[var(--bg-surface-active)] text-[10px] font-bold text-[var(--text-secondary)]">4</span>
+                   <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">输出路径</h3>
+                 </div>
+
+                 <div className="bg-[var(--bg-app)] rounded-xl border border-[var(--border-subtle)] p-1 flex items-center gap-2 pr-2">
+                   <div className="flex-1 px-3 py-2 text-xs font-mono text-[var(--text-muted)] truncate" title={outputDir || "源文件目录"}>
+                     {outputDir || "默认保存至原路径"}
+                   </div>
+                   <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={handleSelectOutputDir}
+                      className="h-7 text-[10px] bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+                   >
+                     <FolderOpen className="w-3 h-3 mr-1.5" />
+                     更改
+                   </Button>
+                 </div>
+              </div>
+
             </div>
           </div>
-
-          {error && (
-            <p className="text-[var(--md-sys-color-error)] text-sm bg-[var(--md-sys-color-error)]/10 p-3 rounded-lg border border-[var(--md-sys-color-error)]/20">{error}</p>
-          )}
         </div>
 
-        {/* 底部按钮 */}
-        <div className="flex items-center justify-end gap-3 p-6 pt-4 border-t border-[var(--md-sys-color-outline-variant)]/50 bg-[var(--md-sys-color-surface-container-low)]">
-          <Button variant="ghost" onClick={closeDialog} disabled={isProcessing}>
+        {/* Footer */}
+        <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] flex justify-end gap-3">
+          <Button
+            variant="ghost"
+            onClick={closeDialog}
+            className="text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          >
             取消
           </Button>
           <Button
             variant="primary"
             onClick={handleExecute}
             disabled={isProcessing || files.length === 0 || (width === null && height === null)}
+            className="px-6 shadow-lg shadow-indigo-500/20"
           >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                处理中...
-              </>
-            ) : (
-              `调整 ${files.length} 个文件`
-            )}
+            {isProcessing ? "处理中..." : "开始调整"}
+            {!isProcessing && <ArrowRight className="w-3.5 h-3.5 ml-2" />}
           </Button>
         </div>
       </div>
