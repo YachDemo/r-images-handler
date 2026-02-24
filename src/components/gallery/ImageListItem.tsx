@@ -84,6 +84,8 @@ export function ImageListItem({ image }: ImageListItemProps) {
   return (
     <>
       <div
+        id={`image-card-${image.path}`}
+        data-path={image.path}
         ref={cardRef}
         className={cn(
           "flex items-center gap-4 px-4 py-2 cursor-pointer transition-colors border-b border-[var(--border-subtle)] group",

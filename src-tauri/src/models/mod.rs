@@ -11,6 +11,17 @@ pub struct FileNode {
     pub expanded: bool,
 }
 
+/// EXIF 信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExifInfo {
+    pub camera_model: Option<String>,
+    pub f_number: Option<String>,
+    pub iso: Option<String>,
+    pub shutter_speed: Option<String>,
+    pub focal_length: Option<String>,
+}
+
 /// 图片文件信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +36,7 @@ pub struct ImageFileInfo {
     pub modified: i64,
     pub modified_formatted: String,
     pub thumbnail_path: Option<String>,
+    pub exif: Option<ExifInfo>,
 }
 
 /// 裁剪参数

@@ -1,11 +1,203 @@
 use std::path::Path;
-use image::{DynamicImage, ImageFormat, imageops};
+use image::{DynamicImage, ImageFormat, imageops, Rgba, GenericImageView};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use std::io::Cursor;
+use ab_glyph::{FontRef, Font, PxScale, ScaleFont};
+use imageproc::drawing::draw_text_mut;
+
+/// 加载字体 (尝试加载系统字体)
+fn load_system_font() -> Option<Vec<u8>> {
+    let paths = [
+        "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/Library/Fonts/Arial.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ];
+
+    for path in paths {
+        if let Ok(bytes) = std::fs::read(path) {
+            return Some(bytes);
+        }
+    }
+    None
+}
 
 /// 加载图片
 pub fn load_image(path: &Path) -> Result<DynamicImage, String> {
     image::open(path).map_err(|e| format!("无法打开图片: {}", e))
+}
+
+/// 内部处理逻辑 (作用于内存图片)
+fn process_watermark_on_image(
+    img: &mut DynamicImage,
+    text: Option<String>,
+    watermark_image: Option<String>,
+    x_ratio: f32,
+    y_ratio: f32,
+    opacity: f32,
+    size: f32,
+    color: String,
+    tiled: bool,
+    gap: f32,
+) -> Result<DynamicImage, String> {
+    let mut img_rgba = img.to_rgba8();
+    let width = img_rgba.width();
+    let height = img_rgba.height();
+
+    // 1. 文字水印
+    if let Some(txt) = text {
+        if let Some(font_data) = load_system_font() {
+            if let Ok(font) = FontRef::try_from_slice(&font_data) {
+                let r = u8::from_str_radix(&color[1..3], 16).unwrap_or(255);
+                let g = u8::from_str_radix(&color[3..5], 16).unwrap_or(255);
+                let b = u8::from_str_radix(&color[5..7], 16).unwrap_or(255);
+                let alpha = (opacity * 255.0) as u8;
+                let text_color = Rgba([r, g, b, alpha]);
+
+                let scale = PxScale::from(size);
+                
+                if tiled {
+                    let scaled_font = font.as_scaled(scale);
+                    let mut text_w = 0.0;
+                    for c in txt.chars() {
+                        text_w += scaled_font.h_advance(scaled_font.glyph_id(c));
+                    }
+                    let text_h = size;
+                    
+                    let gap_x = text_w * gap;
+                    let gap_y = text_h * gap;
+                    
+                    let step_x = (text_w + gap_x) as i32;
+                    let step_y = (text_h + gap_y) as i32;
+                    
+                    if step_x > 0 && step_y > 0 {
+                        for py in (0..height as i32).step_by(step_y as usize) {
+                            for px in (0..width as i32).step_by(step_x as usize) {
+                                draw_text_mut(&mut img_rgba, text_color, px, py, scale, &font, &txt);
+                            }
+                        }
+                    }
+                } else {
+                    let x = (width as f32 * x_ratio) as i32;
+                    let y = (height as f32 * y_ratio) as i32;
+                    draw_text_mut(&mut img_rgba, text_color, x, y, scale, &font, &txt);
+                }
+            }
+        }
+    }
+
+    // 2. 图片水印
+    if let Some(wm_path) = watermark_image {
+        let wm_path = Path::new(&wm_path);
+        if let Ok(wm_img) = image::open(wm_path) {
+            let wm_width = (wm_img.width() as f32 * size) as u32;
+            let wm_height = (wm_img.height() as f32 * size) as u32;
+            let wm_resized = wm_img.resize(wm_width, wm_height, imageops::FilterType::Lanczos3);
+
+            let mut wm_rgba = wm_resized.to_rgba8();
+            for pixel in wm_rgba.pixels_mut() {
+                pixel.0[3] = (pixel.0[3] as f32 * opacity) as u8;
+            }
+            let wm_rgba_dynamic = DynamicImage::ImageRgba8(wm_rgba);
+
+            if tiled {
+                let gap_x = (wm_width as f32 * gap) as u32;
+                let gap_y = (wm_height as f32 * gap) as u32;
+                
+                let step_x = wm_width + gap_x;
+                let step_y = wm_height + gap_y;
+                
+                if step_x > 0 && step_y > 0 {
+                    for py in (0..height).step_by(step_y as usize) {
+                        for px in (0..width).step_by(step_x as usize) {
+                            imageops::overlay(&mut img_rgba, &wm_rgba_dynamic, px as i64, py as i64);
+                        }
+                    }
+                }
+            } else {
+                let x = (width as f32 * x_ratio) as i64;
+                let y = (height as f32 * y_ratio) as i64;
+                imageops::overlay(&mut img_rgba, &wm_rgba_dynamic, x, y);
+            }
+        }
+    }
+
+    Ok(DynamicImage::ImageRgba8(img_rgba))
+}
+
+/// 处理水印逻辑 (接收路径，用于批量处理)
+pub fn process_watermark(
+    path: &Path,
+    text: Option<String>,
+    watermark_image: Option<String>,
+    x_ratio: f32,
+    y_ratio: f32,
+    opacity: f32,
+    size: f32,
+    color: String,
+    tiled: bool,
+    gap: f32,
+) -> Result<DynamicImage, String> {
+    let mut img = load_image(path)?;
+    process_watermark_on_image(&mut img, text, watermark_image, x_ratio, y_ratio, opacity, size, color, tiled, gap)
+}
+
+/// 添加水印 (带缩放，用于预览)
+pub fn apply_watermark_scaled(
+    path: &Path,
+    text: Option<String>,
+    watermark_image: Option<String>,
+    x_ratio: f32,
+    y_ratio: f32,
+    opacity: f32,
+    size: f32,
+    color: String,
+    tiled: bool,
+    gap: f32,
+) -> Result<String, String> {
+    let mut img = load_image(path)?;
+    let (width, height) = img.dimensions();
+    let max_dim = 1000;
+
+    if width > max_dim || height > max_dim {
+        let scale = if width > height {
+            max_dim as f32 / width as f32
+        } else {
+            max_dim as f32 / height as f32
+        };
+
+        let new_width = (width as f32 * scale) as u32;
+        let new_height = (height as f32 * scale) as u32;
+        img = img.resize(new_width, new_height, imageops::FilterType::Lanczos3);
+        
+        let scaled_size = size * scale;
+        
+        return process_watermark_on_image(&mut img, text, watermark_image, x_ratio, y_ratio, opacity, scaled_size, color, tiled, gap)
+            .and_then(|i| image_to_base64(&i));
+    }
+
+    // No resize needed
+    process_watermark_on_image(&mut img, text, watermark_image, x_ratio, y_ratio, opacity, size, color, tiled, gap)
+        .and_then(|i| image_to_base64(&i))
+}
+
+/// 添加水印 (旧接口兼容，或直接使用 scaled)
+pub fn apply_watermark(
+    path: &Path,
+    text: Option<String>,
+    watermark_image: Option<String>,
+    x_ratio: f32,
+    y_ratio: f32,
+    opacity: f32,
+    size: f32,
+    color: String,
+    tiled: bool,
+    gap: f32,
+) -> Result<String, String> {
+    // 默认使用 scaled 版本以优化预览性能
+    apply_watermark_scaled(path, text, watermark_image, x_ratio, y_ratio, opacity, size, color, tiled, gap)
 }
 
 /// 旋转图片

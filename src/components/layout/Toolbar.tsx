@@ -1,15 +1,14 @@
-import { FolderPlus, Grid, List, Search, Settings, File, Loader2, Edit3, FileImage, Maximize2, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { FolderPlus, Grid, List, Search, Settings, File, Loader2, Edit3, FileImage, Maximize2, Trash2, Stamp } from "lucide-react";
 import { Button } from "../ui/Button";
 import { useUIStore } from "../../stores/uiStore";
 import { useFileStore } from "../../stores/fileStore";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useBatchStore } from "../../stores/batchStore";
-import { useFavoritesStore } from "../../favoritesStore"; // Fixed import path from context
+import { useFavoritesStore as useFavoritesStoreActual } from "../../stores/favoritesStore";
 import { selectFolder, scanDirectory, listImages, selectFiles } from "../../services/tauriApi";
 import { cn } from "../../utils/cn";
-
-// Note: Fixing the favoritesStore import if it's actually in stores/
-import { useFavoritesStore as useFavoritesStoreActual } from "../../stores/favoritesStore";
+import { SelectedImagesPopover } from "./SelectedImagesPopover";
 
 export function Toolbar() {
   const { viewMode, setViewMode } = useUIStore();
@@ -25,8 +24,11 @@ export function Toolbar() {
     setSelectedPath
   } = useFileStore();
   const { selectedPaths } = useSelectionStore();
-  const { openRenameDialog, openConvertDialog, openResizeDialog } = useBatchStore();
+  const { openRenameDialog, openConvertDialog, openResizeDialog, openWatermarkDialog } = useBatchStore();
   const { addRecent } = useFavoritesStoreActual();
+
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
 
   const hasSelection = selectedPaths.size > 0;
 
@@ -74,6 +76,28 @@ export function Toolbar() {
           }
         });
         setImages(mergedImages);
+
+        // Add parent directory to workspace
+        const firstFile = images[0];
+        // Simple separator detection
+        const separator = firstFile.path.includes('\\') ? '\\' : '/';
+        const parentDir = firstFile.path.substring(0, firstFile.path.lastIndexOf(separator));
+
+        if (parentDir) {
+          addRecent(parentDir);
+          setSelectedPath(parentDir);
+          
+          if (!rootPaths.includes(parentDir)) {
+            addRootPath(parentDir);
+            try {
+              const tree = await scanDirectory(parentDir);
+              const currentTrees = useFileStore.getState().folderTrees;
+              setFolderTrees([...currentTrees, tree]);
+            } catch (e) {
+              console.error("Failed to scan parent dir:", e);
+            }
+          }
+        }
       }
       setLoading(false);
     } catch (error) {
@@ -196,13 +220,47 @@ export function Toolbar() {
 
             </Button>
 
+            <Button
+
+              variant="ghost"
+
+              size="sm"
+
+              title="批量添加水印"
+
+              onClick={openWatermarkDialog}
+
+               className="h-8 text-xs rounded-lg px-3 hover:bg-[var(--bg-surface-active)]"
+
+            >
+
+              <Stamp className="w-3.5 h-3.5 mr-2" />
+
+              水印
+
+            </Button>
+
             <div className="w-px h-4 bg-[var(--border-subtle)] mx-2" />
 
-            <span className="text-xs font-bold text-[var(--accent)] px-3 tracking-wide">
-
-              {selectedPaths.size} 已选择
-
-            </span>
+            <div className="relative" ref={triggerRef}>
+              <button 
+                onClick={() => setIsPopoverOpen(!isPopoverOpen)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1 rounded-lg transition-all",
+                  isPopoverOpen ? "bg-[var(--accent)]/10 text-[var(--accent)]" : "hover:bg-[var(--bg-surface-active)]"
+                )}
+              >
+                <span className="text-xs font-bold text-[var(--accent)] tracking-wide">
+                  {selectedPaths.size} 已选择
+                </span>
+              </button>
+              
+              <SelectedImagesPopover 
+                isOpen={isPopoverOpen} 
+                onClose={() => setIsPopoverOpen(false)} 
+                triggerRef={triggerRef}
+              />
+            </div>
 
           </div>
 

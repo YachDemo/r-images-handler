@@ -115,6 +115,66 @@ export async function getHomeDir(): Promise<string> {
 }
 
 /**
+ * 应用水印预览
+ */
+export async function applyWatermarkPreview(
+  path: string,
+  text: string | null,
+  watermarkImage: string | null,
+  x: number,
+  y: number,
+  opacity: number,
+  size: number,
+  color: string,
+  tiled: boolean,
+  gap: number,
+): Promise<string> {
+  return invoke<string>("apply_watermark_preview", {
+    path,
+    text,
+    watermarkImage,
+    x,
+    y,
+    opacity,
+    size,
+    color,
+    tiled,
+    gap,
+  });
+}
+
+/**
+ * 批量添加水印
+ */
+export async function batchWatermark(
+  files: string[],
+  text: string | null,
+  watermarkImage: string | null,
+  x: number,
+  y: number,
+  opacity: number,
+  size: number,
+  color: string,
+  tiled: boolean,
+  gap: number,
+  outputDir?: string
+): Promise<number> {
+  return invoke<number>("batch_watermark", {
+    files,
+    text,
+    watermarkImage,
+    x,
+    y,
+    opacity,
+    size,
+    color,
+    tiled,
+    gap,
+    outputDir,
+  });
+}
+
+/**
  * 批量重命名预览
  */
 export async function batchRenamePreview(
@@ -184,6 +244,7 @@ export async function createCollage(
   canvasHeight: number,
   spacing: number,
   borderRadius: number,
+  canvasBorderRadius: number,
   bgColor: string,
   outputPath: string
 ): Promise<void> {
@@ -194,6 +255,7 @@ export async function createCollage(
     canvasHeight,
     spacing,
     borderRadius,
+    canvasBorderRadius,
     bgColor,
     outputPath,
   });

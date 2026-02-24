@@ -5,6 +5,7 @@ import { ImageEditor } from "./components/editor/ImageEditor";
 import { BatchRenameDialog } from "./components/batch/BatchRenameDialog";
 import { BatchConvertDialog } from "./components/batch/BatchConvertDialog";
 import { BatchResizeDialog } from "./components/batch/BatchResizeDialog";
+import { BatchWatermarkDialog } from "./components/batch/BatchWatermarkDialog";
 import { CollageDialog } from "./components/batch/CollageDialog";
 import { useUIStore } from "./stores/uiStore";
 import { useSelectionStore } from "./stores/selectionStore";
@@ -108,6 +109,7 @@ function App() {
       <BatchRenameDialog />
       <BatchConvertDialog />
       <BatchResizeDialog />
+      <BatchWatermarkDialog />
       <CollageDialog />
     </>
   );

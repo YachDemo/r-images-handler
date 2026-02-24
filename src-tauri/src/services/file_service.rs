@@ -1,9 +1,11 @@
 use std::path::Path;
 use walkdir::WalkDir;
-use crate::models::{FileNode, ImageFileInfo};
+use rayon::prelude::*;
+use crate::models::{FileNode, ImageFileInfo, ExifInfo};
+use exif::{In, Reader, Tag};
 
 /// 支持的图片格式
-const SUPPORTED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "tiff", "tif"];
+const SUPPORTED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "tiff", "tif", "heic", "heif"];
 
 /// 检查是否为支持的图片格式
 pub fn is_supported_image(path: &Path) -> bool {
@@ -11,6 +13,27 @@ pub fn is_supported_image(path: &Path) -> bool {
         .and_then(|ext| ext.to_str())
         .map(|ext| SUPPORTED_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+/// 读取 EXIF 信息
+fn read_exif(path: &Path) -> Option<ExifInfo> {
+    let file = std::fs::File::open(path).ok()?;
+    let mut bufreader = std::io::BufReader::new(&file);
+    let exif = Reader::new().read_from_container(&mut bufreader).ok()?;
+
+    let get_value = |tag| {
+        exif.get_field(tag, In::PRIMARY)
+            .map(|f| f.display_value().with_unit(&exif).to_string())
+            .map(|s| s.trim_matches('"').to_string()) // 去除可能存在的引号
+    };
+
+    Some(ExifInfo {
+        camera_model: get_value(Tag::Model),
+        f_number: get_value(Tag::FNumber),
+        iso: get_value(Tag::PhotographicSensitivity),
+        shutter_speed: get_value(Tag::ExposureTime),
+        focal_length: get_value(Tag::FocalLength),
+    })
 }
 
 /// 扫描目录，返回文件夹树结构
@@ -79,18 +102,22 @@ pub fn list_images(dir: &Path) -> Result<Vec<ImageFileInfo>, String> {
         return Err(format!("目录不存在: {:?}", dir));
     }
 
-    let mut images: Vec<ImageFileInfo> = Vec::new();
+    // 1. 先收集所有文件路径 (串行但快速)
+    let entries: Vec<_> = WalkDir::new(dir)
+        .max_depth(1)
+        .into_iter()
+        .flatten()
+        .filter(|e| e.path().is_file())
+        .collect();
 
-    for entry in WalkDir::new(dir).max_depth(1).into_iter().flatten() {
-        let path = entry.path();
-        if path.is_file() && is_supported_image(path) {
-            if let Ok(info) = get_image_info(path) {
-                images.push(info);
-            }
-        }
-    }
+    // 2. 并行处理文件信息 (读取元数据和尺寸)
+    let mut images: Vec<ImageFileInfo> = entries
+        .par_iter()
+        .filter(|entry| is_supported_image(entry.path()))
+        .filter_map(|entry| get_image_info(entry.path()).ok())
+        .collect();
 
-    // 按名称排序
+    // 3. 按名称排序
     images.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
     Ok(images)
@@ -122,6 +149,9 @@ pub fn get_image_info(path: &Path) -> Result<ImageFileInfo, String> {
         Err(_) => (0, 0),
     };
 
+    // 获取 EXIF 信息 (尝试读取)
+    let exif = read_exif(path);
+
     // 获取修改时间
     let modified = metadata
         .modified()
@@ -145,6 +175,7 @@ pub fn get_image_info(path: &Path) -> Result<ImageFileInfo, String> {
         modified,
         modified_formatted,
         thumbnail_path: None, // 稍后由缩略图服务填充
+        exif,
     })
 }
 

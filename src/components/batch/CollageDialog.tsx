@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Grid3X3, Loader2, Move, LayoutGrid } from "lucide-react";
+import { X, Grid3X3, Loader2, Move, LayoutGrid, Settings2 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Slider } from "../ui/Slider";
 import { useBatchStore } from "../../stores/batchStore";
@@ -9,263 +9,59 @@ import { createCollage, selectSavePath } from "../../services/tauriApi";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { cn } from "../../utils/cn";
 
-// 根据图片数量获取可用模板
+// ... (Template definitions remain same, I will copy them back)
+// Since I must provide full content, I'll reuse the previous template logic block.
+
 function getTemplatesForCount(count: number): CollageTemplate[] {
   const templates: CollageTemplate[] = [];
 
+  // ... (Template logic omitted for brevity in thought process, but included in actual call) ...
+  // Actually I need to include it.
+  
   if (count === 2) {
     templates.push(
-      {
-        id: "horizontal-2",
-        name: "左右并排",
-        aspectRatio: 16 / 9,
-        getLayout: () => [
-          { x: 0, y: 0, width: 50, height: 100 },
-          { x: 50, y: 0, width: 50, height: 100 },
-        ],
-      },
-      {
-        id: "vertical-2",
-        name: "上下叠放",
-        aspectRatio: 9 / 16,
-        getLayout: () => [
-          { x: 0, y: 0, width: 100, height: 50 },
-          { x: 0, y: 50, width: 100, height: 50 },
-        ],
-      },
-      {
-        id: "big-small-2",
-        name: "主次分明",
-        aspectRatio: 4 / 3,
-        getLayout: () => [
-          { x: 0, y: 0, width: 65, height: 100 },
-          { x: 65, y: 0, width: 35, height: 100 },
-        ],
-      },
-      {
-        id: "diagonal-2",
-        name: "对角布局",
-        aspectRatio: 1,
-        getLayout: () => [
-          { x: 0, y: 0, width: 60, height: 60 },
-          { x: 40, y: 40, width: 60, height: 60 },
-        ],
-      }
+      { id: "horizontal-2", name: "左右并排", aspectRatio: 16 / 9, getLayout: () => [{ x: 0, y: 0, width: 50, height: 100 }, { x: 50, y: 0, width: 50, height: 100 }] },
+      { id: "vertical-2", name: "上下叠放", aspectRatio: 9 / 16, getLayout: () => [{ x: 0, y: 0, width: 100, height: 50 }, { x: 0, y: 50, width: 100, height: 50 }] },
+      { id: "big-small-2", name: "主次分明", aspectRatio: 4 / 3, getLayout: () => [{ x: 0, y: 0, width: 65, height: 100 }, { x: 65, y: 0, width: 35, height: 100 }] },
+      { id: "diagonal-2", name: "对角布局", aspectRatio: 1, getLayout: () => [{ x: 0, y: 0, width: 60, height: 60 }, { x: 40, y: 40, width: 60, height: 60 }] }
     );
   }
-
   if (count === 3) {
     templates.push(
-      {
-        id: "hero-left-3",
-        name: "左主图",
-        aspectRatio: 4 / 3,
-        getLayout: () => [
-          { x: 0, y: 0, width: 60, height: 100 },
-          { x: 60, y: 0, width: 40, height: 50 },
-          { x: 60, y: 50, width: 40, height: 50 },
-        ],
-      },
-      {
-        id: "hero-right-3",
-        name: "右主图",
-        aspectRatio: 4 / 3,
-        getLayout: () => [
-          { x: 0, y: 0, width: 40, height: 50 },
-          { x: 0, y: 50, width: 40, height: 50 },
-          { x: 40, y: 0, width: 60, height: 100 },
-        ],
-      },
-      {
-        id: "top-hero-3",
-        name: "上主图",
-        aspectRatio: 3 / 4,
-        getLayout: () => [
-          { x: 0, y: 0, width: 100, height: 60 },
-          { x: 0, y: 60, width: 50, height: 40 },
-          { x: 50, y: 60, width: 50, height: 40 },
-        ],
-      },
-      {
-        id: "horizontal-3",
-        name: "横向三分",
-        aspectRatio: 21 / 9,
-        getLayout: () => [
-          { x: 0, y: 0, width: 33.33, height: 100 },
-          { x: 33.33, y: 0, width: 33.33, height: 100 },
-          { x: 66.66, y: 0, width: 33.34, height: 100 },
-        ],
-      },
-      {
-        id: "vertical-3",
-        name: "纵向三分",
-        aspectRatio: 9 / 16,
-        getLayout: () => [
-          { x: 0, y: 0, width: 100, height: 33.33 },
-          { x: 0, y: 33.33, width: 100, height: 33.33 },
-          { x: 0, y: 66.66, width: 100, height: 33.34 },
-        ],
-      }
+      { id: "hero-left-3", name: "左主图", aspectRatio: 4 / 3, getLayout: () => [{ x: 0, y: 0, width: 60, height: 100 }, { x: 60, y: 0, width: 40, height: 50 }, { x: 60, y: 50, width: 40, height: 50 }] },
+      { id: "hero-right-3", name: "右主图", aspectRatio: 4 / 3, getLayout: () => [{ x: 0, y: 0, width: 40, height: 50 }, { x: 0, y: 50, width: 40, height: 50 }, { x: 40, y: 0, width: 60, height: 100 }] },
+      { id: "top-hero-3", name: "上主图", aspectRatio: 3 / 4, getLayout: () => [{ x: 0, y: 0, width: 100, height: 60 }, { x: 0, y: 60, width: 50, height: 40 }, { x: 50, y: 60, width: 50, height: 40 }] },
+      { id: "horizontal-3", name: "横向三分", aspectRatio: 21 / 9, getLayout: () => [{ x: 0, y: 0, width: 33.33, height: 100 }, { x: 33.33, y: 0, width: 33.33, height: 100 }, { x: 66.66, y: 0, width: 33.34, height: 100 }] },
+      { id: "vertical-3", name: "纵向三分", aspectRatio: 9 / 16, getLayout: () => [{ x: 0, y: 0, width: 100, height: 33.33 }, { x: 0, y: 33.33, width: 100, height: 33.33 }, { x: 0, y: 66.66, width: 100, height: 33.34 }] }
     );
   }
-
   if (count === 4) {
     templates.push(
-      {
-        id: "grid-2x2",
-        name: "经典四格",
-        aspectRatio: 1,
-        getLayout: () => [
-          { x: 0, y: 0, width: 50, height: 50 },
-          { x: 50, y: 0, width: 50, height: 50 },
-          { x: 0, y: 50, width: 50, height: 50 },
-          { x: 50, y: 50, width: 50, height: 50 },
-        ],
-      },
-      {
-        id: "hero-side-4",
-        name: "主图侧栏",
-        aspectRatio: 4 / 3,
-        getLayout: () => [
-          { x: 0, y: 0, width: 60, height: 100 },
-          { x: 60, y: 0, width: 40, height: 33.33 },
-          { x: 60, y: 33.33, width: 40, height: 33.33 },
-          { x: 60, y: 66.66, width: 40, height: 33.34 },
-        ],
-      },
-      {
-        id: "t-shape-4",
-        name: "T型布局",
-        aspectRatio: 4 / 3,
-        getLayout: () => [
-          { x: 0, y: 0, width: 100, height: 55 },
-          { x: 0, y: 55, width: 33.33, height: 45 },
-          { x: 33.33, y: 55, width: 33.33, height: 45 },
-          { x: 66.66, y: 55, width: 33.34, height: 45 },
-        ],
-      },
-      {
-        id: "horizontal-4",
-        name: "横向四分",
-        aspectRatio: 3,
-        getLayout: () => [
-          { x: 0, y: 0, width: 25, height: 100 },
-          { x: 25, y: 0, width: 25, height: 100 },
-          { x: 50, y: 0, width: 25, height: 100 },
-          { x: 75, y: 0, width: 25, height: 100 },
-        ],
-      }
+      { id: "grid-2x2", name: "经典四格", aspectRatio: 1, getLayout: () => [{ x: 0, y: 0, width: 50, height: 50 }, { x: 50, y: 0, width: 50, height: 50 }, { x: 0, y: 50, width: 50, height: 50 }, { x: 50, y: 50, width: 50, height: 50 }] },
+      { id: "hero-side-4", name: "主图侧栏", aspectRatio: 4 / 3, getLayout: () => [{ x: 0, y: 0, width: 60, height: 100 }, { x: 60, y: 0, width: 40, height: 33.33 }, { x: 60, y: 33.33, width: 40, height: 33.33 }, { x: 60, y: 66.66, width: 40, height: 33.34 }] },
+      { id: "t-shape-4", name: "T型布局", aspectRatio: 4 / 3, getLayout: () => [{ x: 0, y: 0, width: 100, height: 55 }, { x: 0, y: 55, width: 33.33, height: 45 }, { x: 33.33, y: 55, width: 33.33, height: 45 }, { x: 66.66, y: 55, width: 33.34, height: 45 }] },
+      { id: "horizontal-4", name: "横向四分", aspectRatio: 3, getLayout: () => [{ x: 0, y: 0, width: 25, height: 100 }, { x: 25, y: 0, width: 25, height: 100 }, { x: 50, y: 0, width: 25, height: 100 }, { x: 75, y: 0, width: 25, height: 100 }] }
     );
   }
-
   if (count === 5) {
     templates.push(
-      {
-        id: "mosaic-5",
-        name: "马赛克",
-        aspectRatio: 1,
-        getLayout: () => [
-          { x: 0, y: 0, width: 60, height: 60 },
-          { x: 60, y: 0, width: 40, height: 30 },
-          { x: 60, y: 30, width: 40, height: 30 },
-          { x: 0, y: 60, width: 30, height: 40 },
-          { x: 30, y: 60, width: 70, height: 40 },
-        ],
-      },
-      {
-        id: "pinterest-5",
-        name: "瀑布流",
-        aspectRatio: 3 / 4,
-        getLayout: () => [
-          { x: 0, y: 0, width: 50, height: 40 },
-          { x: 50, y: 0, width: 50, height: 55 },
-          { x: 0, y: 40, width: 50, height: 60 },
-          { x: 50, y: 55, width: 50, height: 45 },
-          { x: 0, y: 100, width: 0, height: 0 }, // 不显示
-        ].slice(0, 4).concat([{ x: 0, y: 0, width: 100, height: 100 }]).slice(0, 5),
-      },
-      {
-        id: "cross-5",
-        name: "十字布局",
-        aspectRatio: 1,
-        getLayout: () => [
-          { x: 25, y: 0, width: 50, height: 33.33 },
-          { x: 0, y: 33.33, width: 33.33, height: 33.33 },
-          { x: 33.33, y: 33.33, width: 33.33, height: 33.33 },
-          { x: 66.66, y: 33.33, width: 33.34, height: 33.33 },
-          { x: 25, y: 66.66, width: 50, height: 33.34 },
-        ],
-      }
+      { id: "mosaic-5", name: "马赛克", aspectRatio: 1, getLayout: () => [{ x: 0, y: 0, width: 60, height: 60 }, { x: 60, y: 0, width: 40, height: 30 }, { x: 60, y: 30, width: 40, height: 30 }, { x: 0, y: 60, width: 30, height: 40 }, { x: 30, y: 60, width: 70, height: 40 }] },
+      { id: "pinterest-5", name: "瀑布流", aspectRatio: 3 / 4, getLayout: () => [{ x: 0, y: 0, width: 50, height: 40 }, { x: 50, y: 0, width: 50, height: 55 }, { x: 0, y: 40, width: 50, height: 60 }, { x: 50, y: 55, width: 50, height: 45 }, { x: 0, y: 100, width: 0, height: 0 }].slice(0, 4).concat([{ x: 0, y: 0, width: 100, height: 100 }]).slice(0, 5) },
+      { id: "cross-5", name: "十字布局", aspectRatio: 1, getLayout: () => [{ x: 25, y: 0, width: 50, height: 33.33 }, { x: 0, y: 33.33, width: 33.33, height: 33.33 }, { x: 33.33, y: 33.33, width: 33.33, height: 33.33 }, { x: 66.66, y: 33.33, width: 33.34, height: 33.33 }, { x: 25, y: 66.66, width: 50, height: 33.34 }] }
     );
   }
-
   if (count === 6) {
     templates.push(
-      {
-        id: "grid-2x3",
-        name: "2×3网格",
-        aspectRatio: 3 / 4,
-        getLayout: () => [
-          { x: 0, y: 0, width: 50, height: 33.33 },
-          { x: 50, y: 0, width: 50, height: 33.33 },
-          { x: 0, y: 33.33, width: 50, height: 33.33 },
-          { x: 50, y: 33.33, width: 50, height: 33.33 },
-          { x: 0, y: 66.66, width: 50, height: 33.34 },
-          { x: 50, y: 66.66, width: 50, height: 33.34 },
-        ],
-      },
-      {
-        id: "grid-3x2",
-        name: "3×2网格",
-        aspectRatio: 4 / 3,
-        getLayout: () => [
-          { x: 0, y: 0, width: 33.33, height: 50 },
-          { x: 33.33, y: 0, width: 33.33, height: 50 },
-          { x: 66.66, y: 0, width: 33.34, height: 50 },
-          { x: 0, y: 50, width: 33.33, height: 50 },
-          { x: 33.33, y: 50, width: 33.33, height: 50 },
-          { x: 66.66, y: 50, width: 33.34, height: 50 },
-        ],
-      },
-      {
-        id: "hero-grid-6",
-        name: "主图+五格",
-        aspectRatio: 4 / 3,
-        getLayout: () => [
-          { x: 0, y: 0, width: 50, height: 66.66 },
-          { x: 50, y: 0, width: 25, height: 33.33 },
-          { x: 75, y: 0, width: 25, height: 33.33 },
-          { x: 50, y: 33.33, width: 25, height: 33.33 },
-          { x: 75, y: 33.33, width: 25, height: 33.33 },
-          { x: 0, y: 66.66, width: 100, height: 33.34 },
-        ],
-      }
+      { id: "grid-2x3", name: "2×3网格", aspectRatio: 3 / 4, getLayout: () => [{ x: 0, y: 0, width: 50, height: 33.33 }, { x: 50, y: 0, width: 50, height: 33.33 }, { x: 0, y: 33.33, width: 50, height: 33.33 }, { x: 50, y: 33.33, width: 50, height: 33.33 }, { x: 0, y: 66.66, width: 50, height: 33.34 }, { x: 50, y: 66.66, width: 50, height: 33.34 }] },
+      { id: "grid-3x2", name: "3×2网格", aspectRatio: 4 / 3, getLayout: () => [{ x: 0, y: 0, width: 33.33, height: 50 }, { x: 33.33, y: 0, width: 33.33, height: 50 }, { x: 66.66, y: 0, width: 33.34, height: 50 }, { x: 0, y: 50, width: 33.33, height: 50 }, { x: 33.33, y: 50, width: 33.33, height: 50 }, { x: 66.66, y: 50, width: 33.34, height: 50 }] },
+      { id: "hero-grid-6", name: "主图+五格", aspectRatio: 4 / 3, getLayout: () => [{ x: 0, y: 0, width: 50, height: 66.66 }, { x: 50, y: 0, width: 25, height: 33.33 }, { x: 75, y: 0, width: 25, height: 33.33 }, { x: 50, y: 33.33, width: 25, height: 33.33 }, { x: 75, y: 33.33, width: 25, height: 33.33 }, { x: 0, y: 66.66, width: 100, height: 33.34 }] }
     );
   }
-
   if (count >= 7 && count <= 9) {
-    templates.push(
-      {
-        id: "grid-3x3",
-        name: "九宫格",
-        aspectRatio: 1,
-        getLayout: () => {
-          const layouts: ImageLayout[] = [];
-          for (let i = 0; i < 9; i++) {
-            layouts.push({
-              x: (i % 3) * 33.33,
-              y: Math.floor(i / 3) * 33.33,
-              width: 33.33,
-              height: 33.33,
-            });
-          }
-          return layouts.slice(0, count);
-        },
-      }
-    );
+    templates.push({ id: "grid-3x3", name: "九宫格", aspectRatio: 1, getLayout: () => Array.from({ length: count }, (_, i) => ({ x: (i % 3) * 33.33, y: Math.floor(i / 3) * 33.33, width: 33.33, height: 33.33 })) });
   }
 
-  // 通用自由布局 - 始终可用
+  // 通用自由布局
   templates.push({
     id: "free",
     name: "自由布局",
@@ -313,34 +109,37 @@ const BG_COLORS = [
 export function CollageDialog() {
   const { activeDialog, closeDialog, isProcessing, setProcessing } = useBatchStore();
   const { selectedPaths, clearSelection } = useSelectionStore();
-  const { images } = useFileStore();
-
-  const selectedImages = images.filter((img) => selectedPaths.has(img.path));
-  const files = selectedImages.map((img) => img.path);
+  
+  // FIX: Use selectedPaths directly instead of filtering 'images' store
+  const files = Array.from(selectedPaths);
   const isOpen = activeDialog === "collage";
 
-  // 根据图片数量获取可用模板
   const templates = getTemplatesForCount(files.length);
 
   const [selectedTemplate, setSelectedTemplate] = useState<CollageTemplate | null>(null);
   const [spacing, setSpacing] = useState(0);
   const [borderRadius, setBorderRadius] = useState(0);
+  const [canvasBorderRadius, setCanvasBorderRadius] = useState(0);
   const [bgColor, setBgColor] = useState("#1e1e1e");
   const [layouts, setLayouts] = useState<ImageLayout[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  
+  // Custom Canvas Size
+  const [customWidth, setCustomWidth] = useState(2400);
+  const [customHeight, setCustomHeight] = useState(2400);
+
   const [error, setError] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ startX: number; startY: number; startLayout: ImageLayout; type: "move" | "resize" } | null>(null);
+  type ResizeType = "move" | "resize-nw" | "resize-ne" | "resize-sw" | "resize-se";
+  const dragRef = useRef<{ startX: number; startY: number; startLayout: ImageLayout; type: ResizeType } | null>(null);
 
-  // 自动选择第一个模板
   useEffect(() => {
     if (isOpen && templates.length > 0) {
       setSelectedTemplate(templates[0]);
     }
   }, [isOpen, files.length]);
 
-  // 当模板变化时更新布局
   useEffect(() => {
     if (selectedTemplate) {
       const newLayouts = selectedTemplate.getLayout();
@@ -349,8 +148,13 @@ export function CollageDialog() {
     }
   }, [selectedTemplate, files.length]);
 
-  const handleMouseDown = (e: React.MouseEvent, index: number, type: "move" | "resize") => {
-    if (selectedTemplate?.id !== "free") return; // 只有自由布局可拖拽
+  // Derived aspect ratio for display
+  const currentAspectRatio = selectedTemplate?.id === "free" 
+    ? customWidth / customHeight 
+    : selectedTemplate?.aspectRatio || 1;
+
+  const handleMouseDown = (e: React.MouseEvent, index: number, type: ResizeType) => {
+    if (selectedTemplate?.id !== "free") return;
     e.preventDefault();
     e.stopPropagation();
     setSelectedIndex(index);
@@ -371,14 +175,34 @@ export function CollageDialog() {
     const deltaY = ((e.clientY - dragRef.current.startY) / rect.height) * 100;
 
     const newLayouts = [...layouts];
-    const layout = { ...dragRef.current.startLayout };
+    const start = dragRef.current.startLayout;
+    const layout = { ...newLayouts[selectedIndex] };
+    const { type } = dragRef.current;
 
-    if (dragRef.current.type === "move") {
-      layout.x = Math.max(0, Math.min(100 - layout.width, layout.x + deltaX));
-      layout.y = Math.max(0, Math.min(100 - layout.height, layout.y + deltaY));
+    const minSize = 5;
+
+    if (type === "move") {
+      layout.x = Math.max(0, Math.min(100 - layout.width, start.x + deltaX));
+      layout.y = Math.max(0, Math.min(100 - layout.height, start.y + deltaY));
     } else {
-      layout.width = Math.max(10, Math.min(100 - layout.x, layout.width + deltaX));
-      layout.height = Math.max(10, Math.min(100 - layout.y, layout.height + deltaY));
+      if (type.includes("e")) {
+        layout.width = Math.max(minSize, Math.min(100 - layout.x, start.width + deltaX));
+      }
+      if (type.includes("s")) {
+        layout.height = Math.max(minSize, Math.min(100 - layout.y, start.height + deltaY));
+      }
+      if (type.includes("w")) {
+        const maxWidth = start.x + start.width - minSize;
+        const newX = Math.max(0, Math.min(maxWidth, start.x + deltaX));
+        layout.x = newX;
+        layout.width = start.width + (start.x - newX);
+      }
+      if (type.includes("n")) {
+        const maxHeight = start.y + start.height - minSize;
+        const newY = Math.max(0, Math.min(maxHeight, start.y + deltaY));
+        layout.y = newY;
+        layout.height = start.height + (start.y - newY);
+      }
     }
 
     newLayouts[selectedIndex] = layout;
@@ -399,16 +223,25 @@ export function CollageDialog() {
     setError(null);
 
     try {
-      const canvasSize = 2400;
-      const aspectRatio = selectedTemplate.aspectRatio;
-      const canvasWidth = aspectRatio >= 1 ? canvasSize : Math.round(canvasSize * aspectRatio);
-      const canvasHeight = aspectRatio >= 1 ? Math.round(canvasSize / aspectRatio) : canvasSize;
+      let canvasWidth = 2400;
+      let canvasHeight = 2400;
+
+      if (selectedTemplate.id === "free") {
+        canvasWidth = customWidth;
+        canvasHeight = customHeight;
+      } else {
+        const baseSize = 2400;
+        const ar = selectedTemplate.aspectRatio;
+        canvasWidth = ar >= 1 ? baseSize : Math.round(baseSize * ar);
+        canvasHeight = ar >= 1 ? Math.round(baseSize / ar) : baseSize;
+      }
 
       const layoutData: [number, number, number, number][] = layouts.map((l) => [l.x, l.y, l.width, l.height]);
 
-      await createCollage(files, layoutData, canvasWidth, canvasHeight, spacing, borderRadius, bgColor, outputPath);
+      await createCollage(files, layoutData, canvasWidth, canvasHeight, spacing, borderRadius, canvasBorderRadius, bgColor, outputPath);
       clearSelection();
       closeDialog();
+      // eslint-disable-next-line no-alert
       alert(`拼图已保存到: ${outputPath}`);
     } catch (err) {
       setError(String(err));
@@ -463,7 +296,6 @@ export function CollageDialog() {
                         : "bg-transparent border-transparent hover:bg-[var(--bg-surface-hover)]"
                     )}
                   >
-                    {/* 模板预览缩略图 */}
                     <div
                       className={cn(
                         "w-full aspect-square rounded-lg mb-2.5 overflow-hidden p-1 transition-colors",
@@ -485,20 +317,22 @@ export function CollageDialog() {
 
           {/* 中间：画布预览 */}
           <div className="flex-1 p-10 flex items-center justify-center bg-[var(--bg-app)] relative overflow-hidden">
-             {/* 背景装饰 */}
             <div className="absolute inset-0 opacity-20 pointer-events-none" 
                  style={{ backgroundImage: 'radial-gradient(var(--border-strong) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
             
             <div
               ref={containerRef}
-              className="relative rounded-lg overflow-hidden shadow-2xl ring-1 ring-white/5"
+              className="relative overflow-hidden shadow-2xl ring-1 ring-white/5"
               style={{
                 backgroundColor: bgColor,
-                aspectRatio: selectedTemplate.aspectRatio,
-                width: selectedTemplate.aspectRatio >= 1 ? "100%" : "auto",
-                height: selectedTemplate.aspectRatio < 1 ? "100%" : "auto",
+                aspectRatio: currentAspectRatio, // Use dynamic aspect ratio
+                width: currentAspectRatio >= 1 ? "100%" : "auto",
+                height: currentAspectRatio < 1 ? "100%" : "auto",
                 maxWidth: "100%",
                 maxHeight: "100%",
+                borderRadius: selectedTemplate.id === "free" 
+                  ? `${(canvasBorderRadius / Math.min(customWidth, customHeight)) * 100}%`
+                  : `${(canvasBorderRadius / 2400) * 100}%` // Approx for fixed templates
               }}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -538,8 +372,7 @@ export function CollageDialog() {
                       className="w-full h-full object-cover"
                       draggable={false}
                     />
-                    {/* 自由布局时显示控制手柄 */}
-                    {selectedTemplate.id === "free" && (
+                    {selectedTemplate.id === "free" && selectedIndex === index && (
                       <>
                         <div
                           className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors"
@@ -547,13 +380,12 @@ export function CollageDialog() {
                         >
                           <Move className="w-5 h-5 text-white opacity-0 group-hover:opacity-70 transition-opacity" />
                         </div>
-                        <div
-                          className="absolute bottom-0 right-0 w-4 h-4 bg-[var(--accent)] cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity rounded-tl"
-                          onMouseDown={(e) => handleMouseDown(e, index, "resize")}
-                        />
+                        <div className="absolute top-0 left-0 w-3 h-3 bg-white border border-[var(--accent)] cursor-nw-resize z-20 shadow-md" onMouseDown={(e) => handleMouseDown(e, index, "resize-nw")} />
+                        <div className="absolute top-0 right-0 w-3 h-3 bg-white border border-[var(--accent)] cursor-ne-resize z-20 shadow-md" onMouseDown={(e) => handleMouseDown(e, index, "resize-ne")} />
+                        <div className="absolute bottom-0 left-0 w-3 h-3 bg-white border border-[var(--accent)] cursor-sw-resize z-20 shadow-md" onMouseDown={(e) => handleMouseDown(e, index, "resize-sw")} />
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-[var(--accent)] border border-white cursor-se-resize z-20 shadow-md" onMouseDown={(e) => handleMouseDown(e, index, "resize-se")} />
                       </>
                     )}
-                    {/* 序号 */}
                     <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/40 text-white text-[9px] font-bold backdrop-blur-md border border-white/10">
                       {index + 1}
                     </div>
@@ -565,6 +397,37 @@ export function CollageDialog() {
 
           {/* 右侧：设置面板 */}
           <div className="w-[260px] p-6 space-y-7 border-l border-[var(--border-subtle)] overflow-y-auto bg-[var(--bg-app)]/50">
+            
+            {/* Canvas Size Settings (Only for Free Layout) */}
+            {selectedTemplate.id === "free" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-[var(--text-primary)]">
+                  <Settings2 className="w-3.5 h-3.5" />
+                  <span className="text-xs font-bold uppercase tracking-wider">画布尺寸 (px)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-[var(--text-muted)] font-bold">宽度</label>
+                    <input 
+                      type="number" 
+                      value={customWidth} 
+                      onChange={(e) => setCustomWidth(Math.max(100, parseInt(e.target.value) || 100))}
+                      className="w-full h-8 px-2 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-[var(--text-muted)] font-bold">高度</label>
+                    <input 
+                      type="number" 
+                      value={customHeight} 
+                      onChange={(e) => setCustomHeight(Math.max(100, parseInt(e.target.value) || 100))}
+                      className="w-full h-8 px-2 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 间距 */}
             <div>
               <Slider label="画面间距" value={spacing} onChange={setSpacing} min={0} max={60} />
@@ -572,7 +435,10 @@ export function CollageDialog() {
 
             {/* 圆角 */}
             <div>
-              <Slider label="图片圆角" value={borderRadius} onChange={setBorderRadius} min={0} max={100} />
+              <div className="space-y-4">
+                <Slider label="图片圆角" value={borderRadius} onChange={setBorderRadius} min={0} max={100} />
+                <Slider label="画布圆角" value={canvasBorderRadius} onChange={setCanvasBorderRadius} min={0} max={300} />
+              </div>
             </div>
 
             {/* 背景颜色 */}
@@ -616,9 +482,11 @@ export function CollageDialog() {
               <div className="flex items-center justify-between text-[10px] font-medium text-[var(--text-muted)]">
                 <span>比例</span>
                 <span className="font-mono text-[var(--text-secondary)]">
-                  {selectedTemplate.aspectRatio >= 1
-                    ? `${Math.round(selectedTemplate.aspectRatio * 3)}:3`
-                    : `3:${Math.round(3 / selectedTemplate.aspectRatio)}`}
+                  {selectedTemplate.id === "free" 
+                    ? `${customWidth} × ${customHeight}`
+                    : selectedTemplate.aspectRatio >= 1
+                      ? `${Math.round(selectedTemplate.aspectRatio * 3)}:3`
+                      : `3:${Math.round(3 / selectedTemplate.aspectRatio)}`}
                 </span>
               </div>
               {selectedTemplate.id === "free" && (
@@ -661,7 +529,6 @@ export function CollageDialog() {
   );
 }
 
-// 模板预览组件
 function TemplatePreview({ template, count }: { template: CollageTemplate; count: number }) {
   const layouts = template.getLayout().slice(0, count);
 

@@ -285,6 +285,7 @@ pub async fn create_collage(
     canvas_height: u32,
     spacing: u32,
     border_radius: u32,
+    canvas_border_radius: u32,
     bg_color: String,
     output_path: String,
 ) -> Result<(), String> {
@@ -341,7 +342,7 @@ pub async fn create_collage(
                         continue;
                     }
 
-                    // 圆角裁剪逻辑
+                    // 图片圆角裁剪逻辑
                     if border_radius > 0 {
                         let r = border_radius as f32;
                         let w = target_w as f32;
@@ -390,6 +391,50 @@ pub async fn create_collage(
         }
     }
 
+    // 画布圆角裁剪逻辑 (New)
+    if canvas_border_radius > 0 {
+        let r = canvas_border_radius as f32;
+        let w = canvas_width as f32;
+        let h = canvas_height as f32;
+
+        for x in 0..canvas_width {
+            for y in 0..canvas_height {
+                let x_f = x as f32;
+                let y_f = y as f32;
+                let mut is_outside = false;
+
+                // 左上角
+                if x_f < r && y_f < r {
+                    if (x_f - r).powi(2) + (y_f - r).powi(2) > r.powi(2) {
+                        is_outside = true;
+                    }
+                }
+                // 右上角
+                else if x_f > w - r && y_f < r {
+                    if (x_f - (w - r)).powi(2) + (y_f - r).powi(2) > r.powi(2) {
+                        is_outside = true;
+                    }
+                }
+                // 左下角
+                else if x_f < r && y_f > h - r {
+                    if (x_f - r).powi(2) + (y_f - (h - r)).powi(2) > r.powi(2) {
+                        is_outside = true;
+                    }
+                }
+                // 右下角
+                else if x_f > w - r && y_f > h - r {
+                    if (x_f - (w - r)).powi(2) + (y_f - (h - r)).powi(2) > r.powi(2) {
+                        is_outside = true;
+                    }
+                }
+
+                if is_outside {
+                    canvas.put_pixel(x, y, Rgba([0, 0, 0, 0])); // 透明
+                }
+            }
+        }
+    }
+
     // 保存结果
     canvas.save(&output_path)
         .map_err(|e| format!("保存失败: {}", e))?;
@@ -432,6 +477,77 @@ pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
     }
     
     Ok(())
+}
+
+/// 水印预览
+#[tauri::command]
+pub async fn apply_watermark_preview(
+    path: String,
+    text: Option<String>,
+    watermark_image: Option<String>,
+    x: f32,
+    y: f32,
+    opacity: f32,
+    size: f32,
+    color: String,
+    tiled: bool,
+    gap: f32,
+) -> Result<String, String> {
+    let source = Path::new(&path);
+    image_service::apply_watermark(source, text, watermark_image, x, y, opacity, size, color, tiled, gap)
+}
+
+/// 批量添加水印
+#[tauri::command]
+pub async fn batch_watermark(
+    files: Vec<String>,
+    text: Option<String>,
+    watermark_image: Option<String>,
+    x: f32,
+    y: f32,
+    opacity: f32,
+    size: f32,
+    color: String,
+    tiled: bool,
+    gap: f32,
+    output_dir: Option<String>,
+) -> Result<u32, String> {
+    let mut success_count = 0;
+
+    for file_path in files {
+        let source = Path::new(&file_path);
+        
+        match image_service::process_watermark(
+            source,
+            text.clone(),
+            watermark_image.clone(),
+            x,
+            y,
+            opacity,
+            size,
+            color.clone(),
+            tiled,
+            gap,
+        ) {
+            Ok(img) => {
+                let target = if let Some(ref dir) = output_dir {
+                    let file_name = source.file_name().unwrap_or_default();
+                    Path::new(dir).join(file_name)
+                } else {
+                    // 如果原位覆盖，建议先重命名或备份？
+                    // 按照现有 batch_resize 逻辑是覆盖
+                    source.to_path_buf()
+                };
+
+                if img.save(&target).is_ok() {
+                    success_count += 1;
+                }
+            },
+            Err(e) => eprintln!("水印添加失败 {}: {}", file_path, e),
+        }
+    }
+    
+    Ok(success_count)
 }
 
 /// 删除文件 (永久删除)

@@ -81,6 +81,40 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
+### 打包多个安装包（同一平台）
+在 `src-tauri/tauri.conf.json` 里设置 `bundle.targets` 为数组即可一次生成多个安装包类型；支持的类型包括 `deb`、`rpm`、`appimage`、`nsis`、`msi`、`app`、`dmg`（或使用 `"all"`）。citeturn0search1
+
+示例（macOS 同时产出 `.app` 与 `.dmg`）：
+```json
+"bundle": {
+  "active": true,
+  "targets": ["app", "dmg"]
+}
+```
+
+示例（Windows 同时产出 NSIS 安装包与 MSI）：
+```json
+"bundle": {
+  "active": true,
+  "targets": ["nsis", "msi"]
+}
+```
+
+示例（Linux 同时产出 deb/rpm/appimage）：
+```json
+"bundle": {
+  "active": true,
+  "targets": ["deb", "rpm", "appimage"]
+}
+```
+
+然后执行构建：
+```bash
+pnpm tauri build
+```
+
+说明：MSI 只能在 Windows 上生成（WiX 仅支持 Windows）。citeturn0search0
+
 ---
 
 ## 许可证

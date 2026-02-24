@@ -30,14 +30,16 @@ export function MainContent() {
         </div>
       )}
 
-      {/* 内容滚动区 - 增加内边距 */}
-      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+      {/* 内容滚动区 - 滚动控制下放给子组件以支持虚拟化 */}
+      <div className="flex-1 overflow-hidden relative">
         {isLoading ? (
-          <SkeletonGrid count={12} />
-        ) : rootPaths.length > 0 ? (
+          <div className="h-full w-full overflow-y-auto p-6 custom-scrollbar">
+             <SkeletonGrid count={12} />
+          </div>
+        ) : selectedPath ? (
           <ImageGrid images={images} />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center">
+          <div className="h-full w-full overflow-y-auto p-6 custom-scrollbar flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
                <ImagePlus className="w-8 h-8 text-zinc-600" />
             </div>
