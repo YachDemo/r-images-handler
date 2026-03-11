@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { X, Maximize2, Link, Unlink, FolderOpen, ArrowRight, CheckCircle2, Scan } from "lucide-react";
+import { X, Maximize2, Link, Unlink, FolderOpen, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
@@ -23,7 +23,6 @@ export function BatchResizeDialog() {
   const [height, setHeight] = useState<number | null>(null);
   const [maintainAspect, setMaintainAspect] = useState(true);
   const [outputDir, setOutputDir] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const files = Array.from(selectedPaths);
   const isOpen = activeDialog === "resize";
@@ -92,7 +91,6 @@ export function BatchResizeDialog() {
     if (files.length === 0 || (width === null && height === null)) return;
 
     setProcessing(true);
-    setError(null);
 
     try {
       const count = await batchResize(
@@ -128,7 +126,7 @@ export function BatchResizeDialog() {
       // eslint-disable-next-line no-alert
       alert(`成功调整 ${count} 个文件尺寸`);
     } catch (err) {
-      setError(String(err));
+      console.error("调整尺寸失败:", err);
     } finally {
       setProcessing(false);
     }

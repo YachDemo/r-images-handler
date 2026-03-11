@@ -4,7 +4,6 @@ import { Button } from "../ui/Button";
 import { Slider } from "../ui/Slider";
 import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
-import { useFileStore } from "../../stores/fileStore";
 import { createCollage, selectSavePath } from "../../services/tauriApi";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { cn } from "../../utils/cn";

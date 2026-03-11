@@ -30,6 +30,7 @@ image = "0.25"
 imageproc = "0.24"
 kamadak-exif = "0.5"
 ab_glyph = "0.2"
+font-kit = "0.11"
 
 # 并行处理
 rayon = "1.10"

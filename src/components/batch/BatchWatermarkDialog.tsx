@@ -1,19 +1,27 @@
-import { useState, useEffect, useMemo } from "react";
-import { X, Stamp, Loader2, Type, Image as ImageIcon, LayoutGrid, CheckCircle2, Grid } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { X, Stamp, Loader2, Type, Image as ImageIcon } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Slider } from "../ui/Slider";
 import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useFileStore } from "../../stores/fileStore";
-import { applyWatermarkPreview, batchWatermark, selectSavePath, listImages } from "../../services/tauriApi";
+import { applyWatermarkPreview, batchWatermark, listImages, getSystemFonts } from "../../services/tauriApi";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { selectFiles } from "../../services/tauriApi";
 import { cn } from "../../utils/cn";
 
+const FONTS = [
+  { label: "系统默认 (PingFang)", value: "/System/Library/Fonts/PingFang.ttc" },
+  { label: "Helvetica", value: "/System/Library/Fonts/Helvetica.ttc" },
+  { label: "Arial", value: "/Library/Fonts/Arial.ttf" },
+  { label: "Times New Roman", value: "/System/Library/Fonts/Supplemental/Times New Roman.ttf" },
+  { label: "Georgia", value: "/Library/Fonts/Georgia.ttf" },
+];
+
 export function BatchWatermarkDialog() {
   const { activeDialog, closeDialog, isProcessing, setProcessing } = useBatchStore();
   const { selectedPaths, clearSelection } = useSelectionStore();
-  const { rootPaths, setImages, images } = useFileStore();
+  const { rootPaths, setImages } = useFileStore();
 
   const files = useMemo(() => Array.from(selectedPaths), [selectedPaths]);
   const isOpen = activeDialog === "watermark";
@@ -22,13 +30,20 @@ export function BatchWatermarkDialog() {
   const [mode, setMode] = useState<"text" | "image">("text");
   const [text, setText] = useState("Watermark");
   const [watermarkImage, setWatermarkImage] = useState<string | null>(null);
-  const [opacity, setOpacity] = useState(80); // 0-100
-  const [size, setSize] = useState(40); // Text size or Image scale
+  const [opacity, setOpacity] = useState(80);
+  const [size, setSize] = useState(40);
   const [color, setColor] = useState("#ffffff");
+  const [fontPath, setFontPath] = useState<string>(FONTS[0].value);
+  const [angle, setAngle] = useState(0);
+  const [isBold, setIsBold] = useState(false);
+  const [lineHeight, setLineHeight] = useState(1.2);
   
+  // Font list
+  const [fonts, setFonts] = useState(FONTS);
+
   // Layout
   const [tiled, setTiled] = useState(false);
-  const [gap, setGap] = useState(1.0); // Spacing ratio for tiled
+  const [gap, setGap] = useState(1.0);
   
   // Position (0.0 - 1.0)
   const [posX, setPosX] = useState(0.5);
@@ -37,6 +52,22 @@ export function BatchWatermarkDialog() {
   const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+
+  // Dragging
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Initialize fonts
+  useEffect(() => {
+    getSystemFonts().then(sysFonts => {
+      if (sysFonts && sysFonts.length > 0) {
+        const sysFontOptions = sysFonts.map(f => ({ label: f, value: f }));
+        // Remove duplicates and merge
+        const uniqueFonts = [...FONTS, ...sysFontOptions].filter((v, i, a) => a.findIndex(t => t.value === v.value) === i);
+        setFonts(uniqueFonts);
+      }
+    }).catch(console.error);
+  }, []);
 
   // Initialize preview path
   useEffect(() => {
@@ -62,7 +93,11 @@ export function BatchWatermarkDialog() {
           mode === "text" ? size : size / 100,
           color,
           tiled,
-          gap
+          gap,
+          angle,
+          fontPath,
+          isBold,
+          lineHeight
         );
         setPreviewSrc(src);
       } catch (e) {
@@ -72,7 +107,7 @@ export function BatchWatermarkDialog() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [isOpen, previewPath, mode, text, watermarkImage, posX, posY, opacity, size, color, tiled, gap]);
+  }, [isOpen, previewPath, mode, text, watermarkImage, posX, posY, opacity, size, color, tiled, gap, angle, fontPath, isBold, lineHeight]);
 
   const handleSelectWatermarkImage = async () => {
     try {
@@ -100,6 +135,10 @@ export function BatchWatermarkDialog() {
         color,
         tiled,
         gap,
+        angle,
+        fontPath,
+        isBold,
+        lineHeight,
         undefined
       );
       
@@ -123,6 +162,29 @@ export function BatchWatermarkDialog() {
     setProcessing(false);
   };
 
+  // Drag Handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (tiled) return;
+    setIsDragging(true);
+    updatePos(e);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    updatePos(e);
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  const updatePos = (e: React.MouseEvent) => {
+    if (!imgRef.current) return;
+    const rect = imgRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    setPosX(Math.max(0, Math.min(1, x)));
+    setPosY(Math.max(0, Math.min(1, y)));
+  };
+
   const positions = [
     { x: 0.05, y: 0.05 }, { x: 0.5, y: 0.05 }, { x: 0.95, y: 0.05 },
     { x: 0.05, y: 0.5 },  { x: 0.5, y: 0.5 },  { x: 0.95, y: 0.5 },
@@ -132,7 +194,10 @@ export function BatchWatermarkDialog() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in"
+      onMouseUp={handleMouseUp}
+    >
       <div className="w-[1000px] h-[700px] bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-strong)] shadow-2xl flex flex-col overflow-hidden animate-slide-in">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)] bg-[var(--bg-app)]/50">
@@ -195,14 +260,35 @@ export function BatchWatermarkDialog() {
               <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">水印内容</label>
               {mode === "text" ? (
                 <div className="space-y-3">
-                  <input
-                    type="text"
+                  <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-sm focus:outline-none focus:border-[var(--accent)]"
-                    placeholder="输入水印文字..."
+                    className="w-full h-20 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-sm focus:outline-none focus:border-[var(--accent)] resize-none"
+                    placeholder="输入水印文字 (支持换行)..."
                   />
+                  
+                  {/* Font Selection */}
+                  <select
+                    value={fontPath}
+                    onChange={(e) => setFontPath(e.target.value)}
+                    className="w-full h-10 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs focus:outline-none focus:border-[var(--accent)] appearance-none"
+                  >
+                    {fonts.map(f => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                  </select>
+
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsBold(!isBold)}
+                      className={cn(
+                        "h-10 px-3 rounded-lg border text-xs font-bold transition-all",
+                        isBold ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      )}
+                      title="加粗"
+                    >
+                      B
+                    </button>
                     <input
                       type="color"
                       value={color}
@@ -247,6 +333,16 @@ export function BatchWatermarkDialog() {
                     <div className={cn("absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm", tiled ? "left-6" : "left-1")} />
                   </div>
                </div>
+               
+               {tiled && (
+                <Slider 
+                  label="平铺间距" 
+                  value={Math.round(gap * 10)} 
+                  onChange={(v) => setGap(v / 10)} 
+                  min={0} 
+                  max={50} 
+                />
+              )}
             </div>
 
             {/* Sliders */}
@@ -258,6 +354,15 @@ export function BatchWatermarkDialog() {
                 min={10} 
                 max={200} 
               />
+              {mode === "text" && (
+                <Slider 
+                  label={`行高 (${lineHeight.toFixed(1)})`}
+                  value={lineHeight * 10} 
+                  onChange={(v) => setLineHeight(v / 10)} 
+                  min={8} 
+                  max={30} 
+                />
+              )}
               <Slider 
                 label={`不透明度 (${opacity}%)`}
                 value={opacity} 
@@ -265,22 +370,19 @@ export function BatchWatermarkDialog() {
                 min={0} 
                 max={100} 
               />
-              
-              {tiled && (
-                <Slider 
-                  label="平铺间距" 
-                  value={Math.round(gap * 10)} 
-                  onChange={(v) => setGap(v / 10)} 
-                  min={0} 
-                  max={50} 
-                />
-              )}
+              <Slider 
+                label={`旋转角度 (${angle}°)`}
+                value={angle} 
+                onChange={setAngle} 
+                min={-180} 
+                max={180} 
+              />
             </div>
 
             {/* Position Grid (Only if NOT tiled) */}
             {!tiled && (
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">位置布局</label>
+                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">位置布局 (支持拖拽)</label>
                 <div className="grid grid-cols-3 gap-2 w-32 mx-auto">
                   {positions.map((pos, i) => {
                     const isActive = Math.abs(pos.x - posX) < 0.1 && Math.abs(pos.y - posY) < 0.1;
@@ -315,9 +417,16 @@ export function BatchWatermarkDialog() {
             )}
             
             <img 
+              ref={imgRef}
               src={previewSrc || (previewPath ? convertFileSrc(previewPath) : "")} 
-              className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
+              className={cn(
+                "max-w-full max-h-full object-contain shadow-2xl rounded-lg",
+                !tiled && "cursor-crosshair active:cursor-grabbing"
+              )}
               alt="Preview"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              draggable={false}
             />
           </div>
         </div>

@@ -3,12 +3,11 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { cn } from "../../utils/cn";
 
 interface SelectedImagesPopoverProps {
   isOpen: boolean;
   onClose: () => void;
-  triggerRef: React.RefObject<HTMLElement>;
+  triggerRef: React.RefObject<HTMLElement | null>;
 }
 
 export function SelectedImagesPopover({ isOpen, onClose, triggerRef }: SelectedImagesPopoverProps) {

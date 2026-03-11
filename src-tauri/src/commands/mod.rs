@@ -1,12 +1,18 @@
 use std::path::Path;
 use crate::models::{FileNode, ImageFileInfo};
-use crate::services::{file_service, thumbnail_service, image_service};
+use crate::services::{file_service, thumbnail_service, image_service, font_service};
 
 /// 扫描目录结构
 #[tauri::command]
 pub async fn scan_directory(path: String) -> Result<FileNode, String> {
     let path = Path::new(&path);
     file_service::scan_directory(path)
+}
+
+/// 获取系统字体列表
+#[tauri::command]
+pub async fn get_system_fonts() -> Result<Vec<String>, String> {
+    Ok(font_service::get_system_fonts())
 }
 
 /// 获取目录下的图片列表
@@ -492,9 +498,13 @@ pub async fn apply_watermark_preview(
     color: String,
     tiled: bool,
     gap: f32,
+    angle: f32,
+    font_path: Option<String>,
+    is_bold: bool,
+    line_height: f32,
 ) -> Result<String, String> {
     let source = Path::new(&path);
-    image_service::apply_watermark(source, text, watermark_image, x, y, opacity, size, color, tiled, gap)
+    image_service::apply_watermark(source, text, watermark_image, x, y, opacity, size, color, tiled, gap, angle, font_path, is_bold, line_height)
 }
 
 /// 批量添加水印
@@ -510,6 +520,10 @@ pub async fn batch_watermark(
     color: String,
     tiled: bool,
     gap: f32,
+    angle: f32,
+    font_path: Option<String>,
+    is_bold: bool,
+    line_height: f32,
     output_dir: Option<String>,
 ) -> Result<u32, String> {
     let mut success_count = 0;
@@ -528,14 +542,16 @@ pub async fn batch_watermark(
             color.clone(),
             tiled,
             gap,
+            angle,
+            font_path.clone(),
+            is_bold,
+            line_height,
         ) {
             Ok(img) => {
                 let target = if let Some(ref dir) = output_dir {
                     let file_name = source.file_name().unwrap_or_default();
                     Path::new(dir).join(file_name)
                 } else {
-                    // 如果原位覆盖，建议先重命名或备份？
-                    // 按照现有 batch_resize 逻辑是覆盖
                     source.to_path_buf()
                 };
 

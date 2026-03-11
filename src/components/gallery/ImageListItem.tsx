@@ -8,7 +8,6 @@ import { revealInExplorer, deleteFile } from "../../services/tauriApi";
 import { ContextMenu, type ContextMenuItem } from "../ui/ContextMenu";
 import { cn } from "../../utils/cn";
 import type { ImageFileInfo } from "../../stores/fileStore";
-import { convertFileSrc } from "@tauri-apps/api/core";
 
 interface ImageListItemProps {
   image: ImageFileInfo;

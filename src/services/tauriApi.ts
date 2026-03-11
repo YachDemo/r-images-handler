@@ -128,6 +128,10 @@ export async function applyWatermarkPreview(
   color: string,
   tiled: boolean,
   gap: number,
+  angle: number,
+  fontPath: string | null,
+  isBold: boolean,
+  lineHeight: number,
 ): Promise<string> {
   return invoke<string>("apply_watermark_preview", {
     path,
@@ -140,6 +144,10 @@ export async function applyWatermarkPreview(
     color,
     tiled,
     gap,
+    angle,
+    fontPath,
+    isBold,
+    lineHeight,
   });
 }
 
@@ -157,6 +165,10 @@ export async function batchWatermark(
   color: string,
   tiled: boolean,
   gap: number,
+  angle: number,
+  fontPath: string | null,
+  isBold: boolean,
+  lineHeight: number,
   outputDir?: string
 ): Promise<number> {
   return invoke<number>("batch_watermark", {
@@ -170,8 +182,19 @@ export async function batchWatermark(
     color,
     tiled,
     gap,
+    angle,
+    fontPath,
+    isBold,
+    lineHeight,
     outputDir,
   });
+}
+
+/**
+ * 获取系统字体列表
+ */
+export async function getSystemFonts(): Promise<string[]> {
+  return invoke<string[]>("get_system_fonts");
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useFileStore } from "../../stores/fileStore";
-import { Info, Calendar, HardDrive, Maximize2, FileType, Loader2, Grid3X3, Image as ImageIcon, BarChart3, Palette, Tag, Camera, Aperture, Clock, MapPin, X, Plus, Stamp } from "lucide-react";
+import { Info, Calendar, HardDrive, Maximize2, FileType, Loader2, Grid3X3, Image as ImageIcon, BarChart3, Palette, Tag, Camera, Aperture, Clock, MapPin, X, Plus } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useBatchStore } from "../../stores/batchStore";
 import { useTagStore } from "../../stores/tagStore";
@@ -11,7 +11,7 @@ import { cn } from "../../utils/cn";
 export function PropertiesPanel() {
   const { selectedPaths } = useSelectionStore();
   const { images } = useFileStore();
-  const { openCollageDialog, openWatermarkDialog } = useBatchStore();
+  const { openCollageDialog } = useBatchStore();
   const { addTag, removeTag, getTags } = useTagStore();
   
   const [imageSrc, setImageSrc] = useState<string | null>(null);

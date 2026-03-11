@@ -5,7 +5,6 @@ import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useFileStore, type ImageFileInfo } from "../../stores/fileStore";
 import { batchRenamePreview, batchRenameExecute, listImages } from "../../services/tauriApi";
-import { cn } from "../../utils/cn";
 
 export function BatchRenameDialog() {
   const { activeDialog, closeDialog, isProcessing, setProcessing } = useBatchStore();
@@ -15,7 +14,6 @@ export function BatchRenameDialog() {
   const [pattern, setPattern] = useState("{name}_{n}");
   const [startNumber, setStartNumber] = useState(1);
   const [preview, setPreview] = useState<[string, string][]>([]);
-  const [error, setError] = useState<string | null>(null);
 
   const files = Array.from(selectedPaths);
   const isOpen = activeDialog === "rename";
@@ -28,11 +26,10 @@ export function BatchRenameDialog() {
 
   const updatePreview = async () => {
     try {
-      setError(null);
       const result = await batchRenamePreview(files, pattern, startNumber);
       setPreview(result);
     } catch (err) {
-      setError(String(err));
+      console.error("预览失败:", err);
     }
   };
 
@@ -69,7 +66,7 @@ export function BatchRenameDialog() {
       // eslint-disable-next-line no-alert
       alert(`成功重命名 ${count} 个文件`);
     } catch (err) {
-      setError(String(err));
+      console.error("重命名失败:", err);
     } finally {
       setProcessing(false);
     }

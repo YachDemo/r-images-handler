@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { FolderTree } from "../file-browser/FolderTree";
 import { 
-  Star, Clock, Folder, X, Trash2, Home, Monitor, 
+  Star, Clock, Folder, X, Home, Monitor, 
   Download, Image as ImageIcon, ChevronRight, ChevronDown, 
   Plus
 } from "lucide-react";

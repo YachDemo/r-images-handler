@@ -23,7 +23,6 @@ export function BatchConvertDialog() {
   const [targetFormat, setTargetFormat] = useState("jpg");
   const [quality, setQuality] = useState(85);
   const [outputDir, setOutputDir] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const files = Array.from(selectedPaths);
   const isOpen = activeDialog === "convert";
@@ -43,7 +42,6 @@ export function BatchConvertDialog() {
     if (files.length === 0) return;
 
     setProcessing(true);
-    setError(null);
 
     try {
       const count = await batchConvert(files, targetFormat, quality, outputDir || undefined);
@@ -73,7 +71,7 @@ export function BatchConvertDialog() {
       // eslint-disable-next-line no-alert
       alert(`成功转换 ${count} 个文件`);
     } catch (err) {
-      setError(String(err));
+      console.error("转换失败:", err);
     } finally {
       setProcessing(false);
     }

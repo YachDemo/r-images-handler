@@ -8,7 +8,7 @@ use commands::{
     apply_edits_preview, save_edited_image, select_save_path, get_home_dir,
     batch_rename_preview, batch_rename_execute, batch_convert, batch_resize,
     create_collage, reveal_in_explorer, delete_file,
-    apply_watermark_preview, batch_watermark
+    apply_watermark_preview, batch_watermark, get_system_fonts
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -37,7 +37,8 @@ pub fn run() {
             reveal_in_explorer,
             delete_file,
             apply_watermark_preview,
-            batch_watermark
+            batch_watermark,
+            get_system_fonts
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

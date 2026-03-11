@@ -4,7 +4,6 @@ import { ImageCard } from "./ImageCard";
 import { ImageListItem } from "./ImageListItem";
 import { useUIStore } from "../../stores/uiStore";
 import type { ImageFileInfo } from "../../stores/fileStore";
-import { ImageOff } from "lucide-react";
 
 interface ImageGridProps {
   images: ImageFileInfo[];
