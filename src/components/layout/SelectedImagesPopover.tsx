@@ -2,7 +2,6 @@ import { useRef, useEffect, useState, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Maximize2 } from "lucide-react";
 import { useSelectionStore } from "../../stores/selectionStore";
-import { useFileStore } from "../../stores/fileStore";
 import { useUIStore } from "../../stores/uiStore";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
@@ -14,7 +13,6 @@ interface SelectedImagesPopoverProps {
 
 export function SelectedImagesPopover({ isOpen, onClose, triggerRef }: SelectedImagesPopoverProps) {
   const { selectedPaths, toggleSelect } = useSelectionStore();
-  const { images } = useFileStore();
   const { openQuickPreview } = useUIStore();
   const popoverRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });

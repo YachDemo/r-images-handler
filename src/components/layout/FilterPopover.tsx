@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Filter, X, RotateCcw, ChevronDown, Calendar, Maximize, FileType } from "lucide-react";
+import { Filter, X, RotateCcw, Calendar, Maximize, FileType } from "lucide-react";
 import { useFileStore, type FilterOptions } from "../../stores/fileStore";
 import { Button } from "../ui/Button";
 import { cn } from "../../utils/cn";

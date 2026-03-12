@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Toolbar } from "./Toolbar";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
@@ -6,7 +5,7 @@ import { PropertiesPanel } from "./PropertiesPanel";
 import { StatusBar } from "./StatusBar";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { useUIStore } from "../../stores/uiStore";
-import { ChevronRight, ChevronLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ChevronRight, ChevronLeft } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 export function MainLayout() {
