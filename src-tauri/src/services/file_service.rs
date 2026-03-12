@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::io::Read;
 use walkdir::WalkDir;
 use rayon::prelude::*;
 use crate::models::{FileNode, ImageFileInfo, ExifInfo};
@@ -13,6 +14,27 @@ pub fn is_supported_image(path: &Path) -> bool {
         .and_then(|ext| ext.to_str())
         .map(|ext| SUPPORTED_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+/// 计算文件哈希 (MD5)，对大文件进行采样以提高性能
+pub fn get_file_hash(path: &Path) -> Result<String, String> {
+    let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    let size = metadata.len();
+
+    // 如果文件小于 1MB，读取全部内容
+    // 如果大于 1MB，为了性能，我们只读取前 1MB
+    let digest = if size <= 1024 * 1024 {
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+        md5::compute(&buffer)
+    } else {
+        let mut buffer = vec![0u8; 1024 * 1024];
+        file.read_exact(&mut buffer).map_err(|e| e.to_string())?;
+        md5::compute(&buffer)
+    };
+
+    Ok(format!("{:x}", digest))
 }
 
 /// 读取 EXIF 信息
@@ -164,6 +186,9 @@ pub fn get_image_info(path: &Path) -> Result<ImageFileInfo, String> {
         .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
         .unwrap_or_else(|| "未知".to_string());
 
+    // 计算哈希
+    let hash = get_file_hash(path).ok();
+
     Ok(ImageFileInfo {
         path: path.to_string_lossy().to_string(),
         name,
@@ -176,6 +201,7 @@ pub fn get_image_info(path: &Path) -> Result<ImageFileInfo, String> {
         modified_formatted,
         thumbnail_path: None, // 稍后由缩略图服务填充
         exif,
+        hash,
     })
 }
 

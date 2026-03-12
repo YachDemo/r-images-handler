@@ -65,11 +65,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       hasChanges: false,
     });
 
-    // 异步加载编辑历史
+    // 异步加载编辑历史：优先使用 hash，如果 hash 匹配但路径变了会自动修复路径
     try {
-      const history = await loadEditSequence(image.path);
+      const history = await loadEditSequence(image.path, image.hash);
       if (history && history.length > 0) {
-        // 寻找最新的 fullState 类型记录
         const lastFullState = [...history].reverse().find(h => h.type === 'fullState');
         if (lastFullState) {
           set({
@@ -102,9 +101,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       params: { rotation, flipH, flipV, brightness, contrast, saturation }
     };
     
-    // 我们这里简化处理，只存一个最新的 fullState。
-    // 如果之后需要无限撤销/重做，可以存整个 [EditOperation] 数组。
-    await saveEditSequence(currentImage.path, [stateToSave]);
+    await saveEditSequence(currentImage.path, [stateToSave], currentImage.hash);
     set({ hasChanges: false });
   },
 

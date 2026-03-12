@@ -37,6 +37,7 @@ pub struct ImageFileInfo {
     pub modified_formatted: String,
     pub thumbnail_path: Option<String>,
     pub exif: Option<ExifInfo>,
+    pub hash: Option<String>,
 }
 
 /// 裁剪参数

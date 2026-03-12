@@ -22,8 +22,9 @@
 *   **存储位置**: 用户应用数据目录下的 `image_studio.db`（由 Tauri 插件自动管理）。
 *   **核心逻辑**: 
     1.  **保存**: 当用户在编辑器修改参数（亮度、旋转等）并点击保存时，物理文件会被改写，同时当前的编辑状态以 JSON 格式存入 SQLite 数据库。
-    2.  **加载**: 再次打开该文件时，`editorStore` 会通过 `path` 异步从数据库加载历史参数并恢复滑块位置。
+    2.  **加载**: 再次打开该文件时，`editorStore` 会通过 `hash` (优先) 和 `path` 异步从数据库加载历史参数并恢复滑块位置。
     3.  **另存为**: 另存为新文件时，系统会自动为新路径建立一份相同的编辑历史副本。
+    4.  **路径追踪 (Path Tracking)**: 为了防止文件重命名或移动导致历史丢失，系统引入了 **文件采样指纹 (MD5)**。如果 `hash` 匹配但 `path` 变了，数据库会自动同步更新路径字段。
 *   **关键文件**:
     *   `src/services/dbService.ts`: 处理数据库初始化及 SQL 执行。
     *   `src/stores/editorStore.ts`: 处理内存状态与持久化状态的同步逻辑。
@@ -36,8 +37,10 @@
 
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `path` | TEXT (PK) | 图片的绝对路径 |
-| `edit_sequence` | TEXT | JSON 序列化后的编辑指令（目前存储最新的 `fullState`） |
+| `id` | INTEGER (PK) | 自增主键 |
+| `path` | TEXT | 图片的绝对路径 |
+| `hash` | TEXT | 图片内容的 MD5 采样指纹 (前 1MB) |
+| `edit_sequence` | TEXT | JSON 序列化后的编辑指令 |
 | `last_modified` | DATETIME | 记录更新时间 |
 
 ---
