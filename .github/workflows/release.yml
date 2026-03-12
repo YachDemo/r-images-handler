@@ -61,6 +61,5 @@ jobs:
           releaseBody: "See the assets below to download the latest version."
           releaseDraft: false
           prerelease: false
-          allowUpdates: true
           args: ${{ matrix.args }}
-          updaterJsonKeepExisting: true # Ensure all platforms are preserved in updater JSON
+

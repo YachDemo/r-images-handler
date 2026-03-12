@@ -21,6 +21,7 @@ export interface ImageFileInfo {
   modifiedFormatted: string;
   thumbnailPath: string | null;
   exif?: ExifInfo;
+  hash?: string | null;
   supportsEditing: boolean;
 }
 

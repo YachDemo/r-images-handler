@@ -129,7 +129,7 @@ export function CollageDialog() {
   const [error, setError] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  type ResizeType = "move" | "resize-nw" | "resize-ne" | "resize-sw" | "resize-se" | "text-move";
+  type ResizeType = "move" | "resize-nw" | "resize-ne" | "resize-sw" | "resize-se" | "text-move" | "content-move";
   const dragRef = useRef<{ startX: number; startY: number; startLayout?: ImageLayout; startText?: TextOverlay; type: ResizeType } | null>(null);
 
   useEffect(() => {
