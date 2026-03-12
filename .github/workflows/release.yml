@@ -56,10 +56,13 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version
           releaseName: "R-Image Studio v__VERSION__"
           releaseBody: "See the assets below to download the latest version."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
+          allowUpdates: true
           args: ${{ matrix.args }}
+          updaterJsonKeepExisting: true # Ensure all platforms are preserved in updater JSON
