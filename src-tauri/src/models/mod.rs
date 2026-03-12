@@ -99,10 +99,18 @@ pub struct TextOverlay {
 
 /// 批量处理进度载荷
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct BatchProgressPayload {
     pub task_id: String,
     pub progress: u32,
     pub total: u32,
     pub message: String,
+}
+
+/// 直方图数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistogramData {
+    pub r: Vec<u32>,
+    pub g: Vec<u32>,
+    pub b: Vec<u32>,
+    pub l: Vec<u32>,
 }

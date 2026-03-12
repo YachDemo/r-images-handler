@@ -4,7 +4,9 @@ import { SkeletonGrid } from "../ui/Loading";
 import { ImagePlus, Folder, ChevronRight } from "lucide-react";
 
 export function MainContent() {
-  const { rootPaths, images, isLoading, selectedPath } = useFileStore();
+  const { rootPaths, isLoading, selectedPath, getFilteredImages, images: allImages } = useFileStore();
+  const images = getFilteredImages();
+  const isFiltered = images.length !== allImages.length;
 
   const getSelectedFolderName = () => {
     if (!selectedPath) return "所有图片";
@@ -23,8 +25,13 @@ export function MainContent() {
           <span className="text-[11px] text-[var(--text-primary)] font-black uppercase tracking-widest truncate">{getSelectedFolderName()}</span>
           
           <div className="ml-auto flex items-center gap-3">
-            <div className="px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/20">
-              <span className="text-[10px] text-[var(--accent)] font-mono font-bold tracking-tighter">{images.length} ITEMS</span>
+            <div className="px-2 py-0.5 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center gap-2">
+              <span className="text-[10px] text-[var(--accent)] font-mono font-bold tracking-tighter">
+                {isFiltered ? `${images.length} / ${allImages.length}` : allImages.length} ITEMS
+              </span>
+              {isFiltered && (
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+              )}
             </div>
           </div>
         </div>

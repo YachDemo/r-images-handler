@@ -72,7 +72,7 @@ export function QuickPreview() {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center animate-fade-in"
+      className="fixed inset-0 z-[10001] bg-black/95 backdrop-blur-2xl flex items-center justify-center animate-fade-in"
       onClick={closeQuickPreview}
     >
       {/* 顶部工具栏 */}

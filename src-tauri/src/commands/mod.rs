@@ -1,8 +1,15 @@
 use std::path::Path;
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 use imageproc::drawing::draw_text_mut;
-use crate::models::{FileNode, ImageFileInfo, TextOverlay};
+use crate::models::{FileNode, ImageFileInfo, TextOverlay, HistogramData};
 use crate::services::{file_service, thumbnail_service, image_service, font_service};
+
+/// 获取图片直方图
+#[tauri::command]
+pub async fn get_histogram(path: String) -> Result<HistogramData, String> {
+    let source = Path::new(&path);
+    image_service::get_histogram(source)
+}
 
 /// 扫描目录结构
 #[tauri::command]

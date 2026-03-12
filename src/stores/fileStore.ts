@@ -31,6 +31,18 @@ export interface FileNode {
   expanded: boolean;
 }
 
+export interface FilterOptions {
+  formats: string[];
+  minWidth: number;
+  minHeight: number;
+  maxWidth: number;
+  maxHeight: number;
+  minSize: number; // in bytes
+  maxSize: number; // in bytes
+  startDate: string | null;
+  endDate: string | null;
+}
+
 interface FileStore {
   rootPaths: string[];
   selectedPath: string | null;
@@ -38,6 +50,14 @@ interface FileStore {
   images: ImageFileInfo[];
   isLoading: boolean;
   error: string | null;
+
+  // 搜索与过滤
+  searchQuery: string;
+  filterOptions: FilterOptions;
+  setSearchQuery: (query: string) => void;
+  setFilterOptions: (options: Partial<FilterOptions>) => void;
+  resetFilters: () => void;
+  getFilteredImages: () => ImageFileInfo[];
 
   addRootPath: (path: string) => void;
   removeRootPath: (path: string) => void;
@@ -52,9 +72,21 @@ interface FileStore {
   triggerRefresh: () => void;
 }
 
+const initialFilterOptions: FilterOptions = {
+  formats: [],
+  minWidth: 0,
+  minHeight: 0,
+  maxWidth: 0,
+  maxHeight: 0,
+  minSize: 0,
+  maxSize: 0,
+  startDate: null,
+  endDate: null,
+};
+
 export const useFileStore = create<FileStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       rootPaths: [],
       selectedPath: null,
       folderTrees: [],
@@ -62,6 +94,70 @@ export const useFileStore = create<FileStore>()(
       isLoading: false,
       error: null,
       refreshKey: 0,
+
+      // 搜索与过滤
+      searchQuery: "",
+      filterOptions: initialFilterOptions,
+      setSearchQuery: (searchQuery) => set({ searchQuery }),
+      setFilterOptions: (options) => set((state) => ({ 
+        filterOptions: { ...state.filterOptions, ...options } 
+      })),
+      resetFilters: () => set({ searchQuery: "", filterOptions: initialFilterOptions }),
+      
+      getFilteredImages: () => {
+        const { images, searchQuery, filterOptions } = get();
+        let filtered = images;
+
+        // 搜索查询
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          filtered = filtered.filter(img => 
+            img.name.toLowerCase().includes(query) || 
+            img.path.toLowerCase().includes(query)
+          );
+        }
+
+        // 格式过滤
+        if (filterOptions.formats.length > 0) {
+          filtered = filtered.filter(img => 
+            filterOptions.formats.includes(img.extension.toLowerCase().replace(".", ""))
+          );
+        }
+
+        // 尺寸过滤
+        if (filterOptions.minWidth > 0) {
+          filtered = filtered.filter(img => img.width >= filterOptions.minWidth);
+        }
+        if (filterOptions.maxWidth > 0) {
+          filtered = filtered.filter(img => img.width <= filterOptions.maxWidth);
+        }
+        if (filterOptions.minHeight > 0) {
+          filtered = filtered.filter(img => img.height >= filterOptions.minHeight);
+        }
+        if (filterOptions.maxHeight > 0) {
+          filtered = filtered.filter(img => img.height <= filterOptions.maxHeight);
+        }
+
+        // 大小过滤 (MB to Bytes)
+        if (filterOptions.minSize > 0) {
+          filtered = filtered.filter(img => img.size >= filterOptions.minSize);
+        }
+        if (filterOptions.maxSize > 0) {
+          filtered = filtered.filter(img => img.size <= filterOptions.maxSize);
+        }
+
+        // 日期过滤
+        if (filterOptions.startDate) {
+          const start = new Date(filterOptions.startDate).getTime();
+          filtered = filtered.filter(img => img.modified >= start);
+        }
+        if (filterOptions.endDate) {
+          const end = new Date(filterOptions.endDate).getTime();
+          filtered = filtered.filter(img => img.modified <= end);
+        }
+
+        return filtered;
+      },
 
       addRootPath: (path) => set((state) => ({ 
         rootPaths: state.rootPaths.includes(path) ? state.rootPaths : [...state.rootPaths, path],

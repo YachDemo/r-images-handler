@@ -53,9 +53,74 @@ pub fn load_image(path: &Path) -> Result<DynamicImage, String> {
     image::open(path).map_err(|e| format!("无法打开图片: {}", e))
 }
 
+/// 变量替换
+pub fn substitute_variables(text: &str, path: &Path, img: &DynamicImage) -> String {
+    let mut result = text.to_string();
+    
+    // {date} - 文件修改日期
+    if result.contains("{date}") {
+        if let Ok(metadata) = std::fs::metadata(path) {
+            if let Ok(modified) = metadata.modified() {
+                let dt: chrono::DateTime<chrono::Local> = modified.into();
+                result = result.replace("{date}", &dt.format("%Y-%m-%d").to_string());
+            }
+        }
+    }
+
+    // {time} - 文件修改时间
+    if result.contains("{time}") {
+        if let Ok(metadata) = std::fs::metadata(path) {
+            if let Ok(modified) = metadata.modified() {
+                let dt: chrono::DateTime<chrono::Local> = modified.into();
+                result = result.replace("{time}", &dt.format("%H:%M:%S").to_string());
+            }
+        }
+    }
+
+    // {name} - 文件名 (不含扩展名)
+    if result.contains("{name}") {
+        if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+            result = result.replace("{name}", name);
+        }
+    }
+
+    // {width} {height}
+    if result.contains("{width}") {
+        result = result.replace("{width}", &img.width().to_string());
+    }
+    if result.contains("{height}") {
+        result = result.replace("{height}", &img.height().to_string());
+    }
+
+    // EXIF 变量
+    if result.contains("{camera}") || result.contains("{iso}") || result.contains("{f}") || result.contains("{shutter}") {
+        if let Ok(file) = std::fs::File::open(path) {
+            let mut bufreader = std::io::BufReader::new(file);
+            let exifreader = exif::Reader::new();
+            if let Ok(exif) = exifreader.read_from_container(&mut bufreader) {
+                if let Some(field) = exif.get_field(exif::Tag::Model, exif::In::PRIMARY) {
+                    result = result.replace("{camera}", &field.display_value().to_string().trim_matches('"'));
+                }
+                if let Some(field) = exif.get_field(exif::Tag::PhotographicSensitivity, exif::In::PRIMARY) {
+                    result = result.replace("{iso}", &field.display_value().to_string());
+                }
+                if let Some(field) = exif.get_field(exif::Tag::FNumber, exif::In::PRIMARY) {
+                    result = result.replace("{f}", &field.display_value().to_string());
+                }
+                if let Some(field) = exif.get_field(exif::Tag::ExposureTime, exif::In::PRIMARY) {
+                    result = result.replace("{shutter}", &field.display_value().to_string());
+                }
+            }
+        }
+    }
+
+    result
+}
+
 /// 内部处理逻辑 (作用于内存图片)
 fn process_watermark_on_image(
     img: &mut DynamicImage,
+    path: &Path,
     text: Option<String>,
     watermark_image: Option<String>,
     x_ratio: f32,
@@ -68,7 +133,7 @@ fn process_watermark_on_image(
     angle: f32, 
     font_path: Option<String>,
     is_bold: bool,
-    line_height: f32, // New: Line height multiplier (e.g. 1.2)
+    line_height: f32,
 ) -> Result<DynamicImage, String> {
     let mut img_rgba = img.to_rgba8();
     let width = img_rgba.width();
@@ -77,7 +142,8 @@ fn process_watermark_on_image(
     let mut wm_layer: Option<image::RgbaImage> = None;
 
     // 1. 文字水印 (支持多行)
-    if let Some(txt) = text {
+    if let Some(raw_text) = text {
+        let txt = substitute_variables(&raw_text, path, img);
         if let Some(font_data) = load_font(font_path.as_deref()) {
             if let Ok(font) = FontRef::try_from_slice(&font_data) {
                 let r = u8::from_str_radix(&color[1..3], 16).unwrap_or(255);
@@ -94,8 +160,6 @@ fn process_watermark_on_image(
                 // 实际行间距像素值
                 let line_spacing_px = size * line_height; 
                 // 总高度 = 第一行高度(size) + (行数-1) * 行间距
-                // 注意：imageproc draw_text 坐标是基线还是左上角？通常是左上角。
-                // 字体高度 approximate. scaled_font.height() gives ascent - descent.
                 let font_h = scaled_font.height();
                 let text_h = if lines.is_empty() { 0.0 } else { font_h + (lines.len() as f32 - 1.0) * line_spacing_px };
                 
@@ -207,6 +271,42 @@ fn process_watermark_on_image(
     Ok(DynamicImage::ImageRgba8(img_rgba))
 }
 
+
+use crate::models::HistogramData;
+
+/// 获取直方图数据
+pub fn get_histogram(path: &Path) -> Result<HistogramData, String> {
+    let mut img = load_image(path)?;
+    
+    // 为了提高性能，如果是大图则先缩小
+    let (width, height) = img.dimensions();
+    if width > 800 || height > 800 {
+        img = img.thumbnail(800, 800);
+    }
+    
+    let mut r = vec![0u32; 256];
+    let mut g = vec![0u32; 256];
+    let mut b = vec![0u32; 256];
+    let mut l = vec![0u32; 256];
+    
+    let rgba = img.to_rgba8();
+    for pixel in rgba.pixels() {
+        let rv = pixel.0[0] as usize;
+        let gv = pixel.0[1] as usize;
+        let bv = pixel.0[2] as usize;
+        
+        r[rv] += 1;
+        g[gv] += 1;
+        b[bv] += 1;
+        
+        // 计算亮度 (Rec. 601)
+        let lum = (0.299 * rv as f32 + 0.587 * gv as f32 + 0.114 * bv as f32) as usize;
+        l[lum.clamp(0, 255)] += 1;
+    }
+    
+    Ok(HistogramData { r, g, b, l })
+}
+
 /// 处理水印逻辑
 pub fn process_watermark(
     path: &Path,
@@ -225,7 +325,7 @@ pub fn process_watermark(
     line_height: f32,
 ) -> Result<DynamicImage, String> {
     let mut img = load_image(path)?;
-    process_watermark_on_image(&mut img, text, watermark_image, x_ratio, y_ratio, opacity, size, color, tiled, gap, angle, font_path, is_bold, line_height)
+    process_watermark_on_image(&mut img, path, text, watermark_image, x_ratio, y_ratio, opacity, size, color, tiled, gap, angle, font_path, is_bold, line_height)
 }
 
 /// 添加水印 (带缩放，用于预览)
@@ -262,11 +362,11 @@ pub fn apply_watermark_scaled(
         
         let scaled_size = size * scale;
         
-        return process_watermark_on_image(&mut img, text, watermark_image, x_ratio, y_ratio, opacity, scaled_size, color, tiled, gap, angle, font_path, is_bold, line_height)
+        return process_watermark_on_image(&mut img, path, text, watermark_image, x_ratio, y_ratio, opacity, scaled_size, color, tiled, gap, angle, font_path, is_bold, line_height)
             .and_then(|i| image_to_base64(&i));
     }
 
-    process_watermark_on_image(&mut img, text, watermark_image, x_ratio, y_ratio, opacity, size, color, tiled, gap, angle, font_path, is_bold, line_height)
+    process_watermark_on_image(&mut img, path, text, watermark_image, x_ratio, y_ratio, opacity, size, color, tiled, gap, angle, font_path, is_bold, line_height)
         .and_then(|i| image_to_base64(&i))
 }
 

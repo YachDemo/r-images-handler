@@ -1,6 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { FileNode, ImageFileInfo } from "../stores/fileStore";
 
+export interface HistogramData {
+  r: number[];
+  g: number[];
+  b: number[];
+  l: number[];
+}
+
+/**
+ * 获取图片直方图
+ */
+export async function getHistogram(path: string): Promise<HistogramData> {
+  return invoke<HistogramData>("get_histogram", { path });
+}
+
 /**
  * 扫描目录结构
  */

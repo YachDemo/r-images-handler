@@ -1,26 +1,28 @@
 import { useState, useEffect } from "react";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useFileStore } from "../../stores/fileStore";
-import { Info, Calendar, HardDrive, Maximize2, FileType, Loader2, Grid3X3, Image as ImageIcon, BarChart3, Palette, Tag, Camera, Aperture, Clock, MapPin, X, Plus } from "lucide-react";
+import { Info, Calendar, HardDrive, Maximize2, FileType, Loader2, Grid3X3, Image as ImageIcon, BarChart3, Palette, Tag, Camera, Aperture, Clock, MapPin, X, Plus, PanelRightClose } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useBatchStore } from "../../stores/batchStore";
 import { useTagStore } from "../../stores/tagStore";
+import { useUIStore } from "../../stores/uiStore";
 import { Button } from "../ui/Button";
 import { cn } from "../../utils/cn";
+import { getHistogram, type HistogramData } from "../../services/tauriApi";
+import { Histogram } from "../ui/Histogram";
 
 export function PropertiesPanel() {
   const { selectedPaths } = useSelectionStore();
   const { images } = useFileStore();
   const { openCollageDialog } = useBatchStore();
   const { addTag, removeTag, getTags } = useTagStore();
+  const { toggleProperties } = useUIStore();
   
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [histogramData, setHistogramData] = useState<HistogramData | null>(null);
   
-  // Focused image for multi-selection detail view
   const [focusedImage, setFocusedImage] = useState<any | null>(null);
-  
-  // Tagging state
   const [newTag, setNewTag] = useState("");
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isBatchTagging, setIsBatchTagging] = useState(false);
@@ -29,7 +31,6 @@ export function PropertiesPanel() {
   const selectedImages = Array.from(selectedPaths).map((path) => {
     const found = images.find((img) => img.path === path);
     if (found) return found;
-    // Fallback for cross-folder selection
     const name = path.split(/[/\\]/).pop() || path;
     const extension = name.split(".").pop() || "";
     return {
@@ -46,15 +47,21 @@ export function PropertiesPanel() {
     };
   });
   
-  // Reset focus when selection changes
   useEffect(() => {
     setFocusedImage(null);
     setIsAddingTag(false);
     setNewTag("");
   }, [selectedPaths]);
 
+  useEffect(() => {
+    const handleFocusImage = (e: any) => {
+      if (e.detail) setFocusedImage(e.detail);
+    };
+    window.addEventListener('focus-image', handleFocusImage);
+    return () => window.removeEventListener('focus-image', handleFocusImage);
+  }, []);
+
   const selectedImage = selectedImages.length === 1 ? selectedImages[0] : null;
-  // Determine which image to show details for (single selection OR focused in multi-select)
   const displayImage = selectedImage || focusedImage;
   const currentTags = displayImage ? getTags(displayImage.path) : [];
 
@@ -63,8 +70,13 @@ export function PropertiesPanel() {
       setImageLoaded(false);
       const src = convertFileSrc(displayImage.path);
       setImageSrc(src);
+      setHistogramData(null);
+      getHistogram(displayImage.path)
+        .then(setHistogramData)
+        .catch(err => console.error("Failed to fetch histogram:", err));
     } else {
       setImageSrc(null);
+      setHistogramData(null);
     }
   }, [displayImage?.path]);
 
@@ -95,18 +107,25 @@ export function PropertiesPanel() {
     <div className="flex flex-col h-full bg-[var(--bg-surface)]">
       {/* 标题栏 */}
       <div className="h-[var(--toolbar-height)] px-4 flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/80 backdrop-blur-md sticky top-0 z-10">
-        <span className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.15em] select-none">
-          属性检查器
-        </span>
-        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--accent)] text-white shadow-sm">
-           {selectedImages.length} 选中
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-black text-[var(--text-secondary)] uppercase tracking-[0.15em] select-none">
+            属性检查器
+          </span>
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--accent)] text-white shadow-sm">
+             {selectedImages.length} 选中
+          </span>
+        </div>
+        
+        <button 
+          onClick={toggleProperties}
+          className="p-2 rounded-xl hover:bg-white/5 text-[var(--text-muted)] hover:text-white transition-all group"
+          title="收起侧边栏"
+        >
+          <PanelRightClose className="w-4.5 h-4.5 group-hover:scale-110 transition-transform" />
+        </button>
       </div>
 
-      {/* 属性内容滚动区 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
-        
-        {/* 多选模式下的概览网格 (始终显示) */}
         {selectedImages.length > 1 && (
             <PropertyCard title="多选概览" icon={Grid3X3}>
                <div className="flex flex-col gap-4">
@@ -143,7 +162,6 @@ export function PropertiesPanel() {
             </PropertyCard>
         )}
 
-        {/* 详情展示区 (单选 或 多选时的聚焦) */}
         {displayImage ? (
           <div className="flex flex-col gap-4 animate-fade-in">
             {focusedImage && (
@@ -152,14 +170,12 @@ export function PropertiesPanel() {
                 <button 
                   onClick={() => setFocusedImage(null)}
                   className="p-1 rounded hover:bg-[var(--bg-surface-active)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                  title="关闭详情"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
 
-            {/* 1. 预览卡片 */}
             <PropertyCard className="overflow-hidden p-0 border-0 bg-[var(--bg-app)]">
               <div className="aspect-video w-full bg-[var(--bg-app)] relative flex items-center justify-center group">
                  {!imageLoaded && (
@@ -167,9 +183,6 @@ export function PropertiesPanel() {
                     <Loader2 className="w-5 h-5 text-[var(--accent)] animate-spin" />
                   </div>
                 )}
-                <div className="absolute inset-0 opacity-[0.05] pointer-events-none" 
-                     style={{ backgroundImage: 'conic-gradient(#fff 0.25turn, transparent 0.25turn 0.5turn, #fff 0.5turn 0.75turn, transparent 0.75turn)', backgroundSize: '16px 16px' }}>
-                </div>
                 <img
                   src={imageSrc || ""}
                   alt={displayImage.name}
@@ -179,14 +192,12 @@ export function PropertiesPanel() {
                   )}
                   onLoad={() => setImageLoaded(true)}
                 />
-                
                 <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[10px] text-white/90 font-mono opacity-0 group-hover:opacity-100 transition-opacity">
                   {displayImage.width} × {displayImage.height}
                 </div>
               </div>
             </PropertyCard>
 
-            {/* 2. 基本信息卡片 */}
             <PropertyCard title="基本信息" icon={Info}>
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
@@ -208,29 +219,9 @@ export function PropertiesPanel() {
               </div>
             </PropertyCard>
 
-             {/* 3. 图像分析卡片 (模拟) */}
             <PropertyCard title="图像分析" icon={BarChart3}>
                <div className="flex flex-col gap-4">
-                  {/* 模拟直方图 */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
-                      <span>RGB 直方图</span>
-                      <span>ISO 200</span>
-                    </div>
-                    <div className="h-16 flex items-end gap-[1px] opacity-80">
-                      {[...Array(20)].map((_, i) => (
-                        <div key={i} className="flex-1 bg-[var(--accent)]/30 rounded-t-[1px]" style={{ height: `${Math.random() * 80 + 20}%` }} />
-                      ))}
-                      {[...Array(20)].map((_, i) => (
-                         <div key={`g-${i}`} className="flex-1 bg-green-500/30 rounded-t-[1px]" style={{ height: `${Math.random() * 80 + 20}%` }} />
-                      ))}
-                      {[...Array(20)].map((_, i) => (
-                         <div key={`b-${i}`} className="flex-1 bg-blue-500/30 rounded-t-[1px]" style={{ height: `${Math.random() * 80 + 20}%` }} />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 模拟色板 */}
+                  <Histogram data={histogramData} />
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
                        <Palette className="w-3 h-3" />
@@ -245,7 +236,6 @@ export function PropertiesPanel() {
                </div>
             </PropertyCard>
 
-             {/* 4. 元数据卡片 (真实数据) */}
             <PropertyCard title="拍摄信息" icon={Camera}>
               <div className="grid grid-cols-2 gap-y-3 gap-x-2">
                  <InfoRow icon={Camera} label="设备" value={displayImage.exif?.cameraModel || "-"} />
@@ -257,17 +247,13 @@ export function PropertiesPanel() {
               </div>
             </PropertyCard>
 
-             {/* 5. 标签管理 (真实功能) */}
              <PropertyCard title="标签" icon={Tag}>
                 <div className="flex flex-wrap gap-2 mb-2">
                    {currentTags.length > 0 ? (
                      currentTags.map(tag => (
                        <div key={tag} className="group px-2 py-1 rounded-md bg-[var(--accent-surface)] border border-[var(--accent-glow)] text-[var(--accent)] text-xs font-medium flex items-center gap-1">
                          <span>{tag}</span>
-                         <button 
-                           onClick={() => removeTag(displayImage.path, tag)}
-                           className="w-3 h-3 rounded-full hover:bg-[var(--accent)]/20 flex items-center justify-center transition-colors"
-                         >
+                         <button onClick={() => removeTag(displayImage.path, tag)} className="w-3 h-3 rounded-full hover:bg-[var(--accent)]/20 flex items-center justify-center">
                            <X className="w-2 h-2" />
                          </button>
                        </div>
@@ -276,7 +262,6 @@ export function PropertiesPanel() {
                      <p className="text-[10px] text-[var(--text-muted)] italic py-1">暂无标签</p>
                    )}
                 </div>
-                
                 {isAddingTag ? (
                   <div className="flex items-center gap-2 animate-fade-in">
                     <input
@@ -284,23 +269,12 @@ export function PropertiesPanel() {
                       autoFocus
                       value={newTag}
                       onChange={(e) => setNewTag(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddTag();
-                        if (e.key === "Escape") setIsAddingTag(false);
-                      }}
-                      onBlur={() => { if (!newTag) setIsAddingTag(false); }}
-                      placeholder="输入标签..."
                       className="flex-1 h-7 px-2 rounded bg-[var(--bg-app)] border border-[var(--border-subtle)] text-xs focus:outline-none focus:border-[var(--accent)]"
                     />
-                    <Button size="sm" variant="primary" onClick={handleAddTag} className="h-7 px-2 text-xs">
-                      确定
-                    </Button>
+                    <Button size="sm" variant="primary" onClick={handleAddTag} className="h-7 px-2 text-xs">确定</Button>
                   </div>
                 ) : (
-                  <button 
-                    onClick={() => setIsAddingTag(true)}
-                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs hover:border-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer transition-all"
-                  >
+                  <button onClick={() => setIsAddingTag(true)} className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs hover:border-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all">
                     <Plus className="w-3 h-3" />
                     <span>添加标签</span>
                   </button>
@@ -308,7 +282,6 @@ export function PropertiesPanel() {
              </PropertyCard>
           </div>
         ) : (
-          /* 多选时未选中聚焦图片，显示批量操作 */
           selectedImages.length > 1 && !focusedImage && (
             <PropertyCard title="批量操作" icon={BarChart3}>
                <div className="flex flex-col gap-3">
@@ -316,7 +289,6 @@ export function PropertiesPanel() {
                      <Grid3X3 className="w-4 h-4 mr-2" />
                      创建拼图
                   </Button>
-                  
                   {isBatchTagging ? (
                     <div className="flex items-center gap-2 animate-fade-in">
                       <input
@@ -324,24 +296,12 @@ export function PropertiesPanel() {
                         autoFocus
                         value={batchTag}
                         onChange={(e) => setBatchTag(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleBatchAddTag();
-                          if (e.key === "Escape") setIsBatchTagging(false);
-                        }}
-                        onBlur={() => { if (!batchTag) setIsBatchTagging(false); }}
-                        placeholder="输入标签..."
                         className="flex-1 h-8 px-2 rounded bg-[var(--bg-app)] border border-[var(--border-subtle)] text-xs focus:outline-none focus:border-[var(--accent)]"
                       />
-                      <Button size="sm" variant="primary" onClick={handleBatchAddTag} className="h-8 px-3 text-xs">
-                        确定
-                      </Button>
+                      <Button size="sm" variant="primary" onClick={handleBatchAddTag} className="h-8 px-3 text-xs">确定</Button>
                     </div>
                   ) : (
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-start border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-active)]"
-                      onClick={() => setIsBatchTagging(true)}
-                    >
+                    <Button variant="ghost" className="w-full justify-start border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-active)]" onClick={() => setIsBatchTagging(true)}>
                        <Tag className="w-4 h-4 mr-2" />
                        批量添加标签
                     </Button>
@@ -351,7 +311,6 @@ export function PropertiesPanel() {
           )
         )}
         
-        {/* 空状态 */}
         {selectedImages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] text-center gap-4 opacity-60">
              <div className="p-4 rounded-full bg-[var(--bg-app)] border border-[var(--border-subtle)]">
@@ -365,17 +324,7 @@ export function PropertiesPanel() {
   );
 }
 
-function PropertyCard({ 
-  children, 
-  title, 
-  icon: Icon,
-  className 
-}: { 
-  children: React.ReactNode; 
-  title?: string; 
-  icon?: React.ElementType;
-  className?: string;
-}) {
+function PropertyCard({ children, title, icon: Icon, className }: { children: React.ReactNode; title?: string; icon?: React.ElementType; className?: string; }) {
   return (
     <div className={cn("w-full bg-[var(--bg-surface-hover)]/30 border border-[var(--border-subtle)] rounded-xl p-4 shadow-sm transition-all hover:border-[var(--border-strong)] flex flex-col gap-3", className)}>
       {title && (

@@ -271,8 +271,48 @@ export function BatchWatermarkDialog() {
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     className="w-full h-20 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-sm focus:outline-none focus:border-[var(--accent)] resize-none"
-                    placeholder="输入水印文字 (支持换行)..."
+                    placeholder="输入水印文字 (支持变量)..."
                   />
+                  
+                  {/* Variable Guide */}
+                  <div className="flex flex-wrap gap-1.5 p-2 rounded-lg bg-black/20 border border-white/5">
+                    {[
+                      { tag: "{name}", label: "名称" },
+                      { tag: "{date}", label: "日期" },
+                      { tag: "{camera}", label: "型号" },
+                      { tag: "{f}", label: "光圈" },
+                      { tag: "{iso}", label: "ISO" },
+                      { tag: "{shutter}", label: "快门" },
+                    ].map(v => (
+                      <button
+                        key={v.tag}
+                        onClick={() => setText(prev => prev + v.tag)}
+                        className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[9px] font-bold text-zinc-400 hover:text-[var(--accent)] transition-colors border border-transparent hover:border-[var(--accent)]/30"
+                        title={v.label}
+                      >
+                        {v.tag}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Variable Description Panel */}
+                  <div className="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10 space-y-3">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                      <span>变量使用说明</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      <VariableHelpItem tag="{name}" desc="文件原始名称 (不含后缀)" />
+                      <VariableHelpItem tag="{date}" desc="图片最后修改日期 (YYYY-MM-DD)" />
+                      <VariableHelpItem tag="{camera}" desc="相机/手机型号 (从 EXIF 获取)" />
+                      <VariableHelpItem tag="{f}" desc="光圈值，如 f/2.8" />
+                      <VariableHelpItem tag="{iso}" desc="感光度，如 ISO 100" />
+                      <VariableHelpItem tag="{shutter}" desc="快门速度，如 1/125" />
+                    </div>
+                    <p className="text-[9px] text-zinc-500 leading-relaxed italic">
+                      * 预览时仅显示首张图片的元数据，批量执行时会针对每张图片动态替换。
+                    </p>
+                  </div>
                   
                   {/* Font Selection */}
                   <select
@@ -449,3 +489,17 @@ export function BatchWatermarkDialog() {
     </div>
   );
 }
+
+function VariableHelpItem({ tag, desc }: { tag: string; desc: string }) {
+  return (
+    <div className="flex items-start gap-2 group cursor-default">
+      <div className="min-w-[55px]">
+        <code className="text-[10px] font-black text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/10 group-hover:bg-indigo-500/20 transition-colors block text-center">
+          {tag}
+        </code>
+      </div>
+      <span className="text-[10px] text-zinc-500 mt-0.5 leading-snug group-hover:text-zinc-400 transition-colors">{desc}</span>
+    </div>
+  );
+}
+

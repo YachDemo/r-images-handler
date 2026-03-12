@@ -12,6 +12,7 @@ import { BatchConvertDialog } from "./components/batch/BatchConvertDialog";
 import { BatchResizeDialog } from "./components/batch/BatchResizeDialog";
 import { BatchWatermarkDialog } from "./components/batch/BatchWatermarkDialog";
 import { CollageDialog } from "./components/batch/CollageDialog";
+import { SettingsDialog } from "./components/layout/SettingsDialog";
 import { TaskQueue } from "./components/layout/TaskQueue";
 import { useUIStore } from "./stores/uiStore";
 import { useSelectionStore } from "./stores/selectionStore";
@@ -218,6 +219,7 @@ function App() {
       <BatchResizeDialog />
       <BatchWatermarkDialog />
       <CollageDialog />
+      <SettingsDialog />
       <TaskQueue />
     </>
   );
