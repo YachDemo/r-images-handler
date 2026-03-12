@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { X, Settings, RefreshCw, ArrowUpCircle, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { X, Settings, RefreshCw, ArrowUpCircle, CheckCircle2, AlertCircle, Info, Database, Trash2 } from "lucide-react";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Button } from "../ui/Button";
 import { useUIStore } from "../../stores/uiStore";
 import { getVersion } from "@tauri-apps/api/app";
+import { clearAllEdits, getEditsCount } from "../../services/dbService";
 
 export function SettingsDialog() {
   const { isSettingsOpen, setSettingsOpen } = useUIStore();
@@ -14,12 +15,31 @@ export function SettingsDialog() {
   const [error, setError] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [editsCount, setEditsCount] = useState<number>(0);
+  const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
     if (isSettingsOpen) {
       getVersion().then(setAppVersion);
+      updateEditsCount();
     }
   }, [isSettingsOpen]);
+
+  const updateEditsCount = async () => {
+    const count = await getEditsCount();
+    setEditsCount(count);
+  };
+
+  const handleClearEdits = async () => {
+    if (window.confirm("确定要清空所有图片的编辑历史吗？这将导致无法撤销之前的修改。")) {
+      setIsClearing(true);
+      const success = await clearAllEdits();
+      if (success) {
+        await updateEditsCount();
+      }
+      setIsClearing(false);
+    }
+  };
 
   const checkForUpdates = async () => {
     setChecking(true);
@@ -102,7 +122,37 @@ export function SettingsDialog() {
         </div>
 
         {/* Content */}
-        <div className="p-6 flex flex-col gap-6">
+        <div className="p-6 flex flex-col gap-6 max-h-[60vh] overflow-y-auto">
+          {/* Storage Management */}
+          <div className="flex flex-col gap-3 p-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                <Database className="w-5 h-5 text-[var(--accent)]" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-[var(--text-primary)]">存储管理</p>
+                <p className="text-[10px] text-[var(--text-muted)]">管理应用生成的本地缓存与历史</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between py-2 border-t border-[var(--border-subtle)] mt-1">
+              <div>
+                <p className="text-[10px] font-medium text-[var(--text-secondary)]">非破坏性编辑历史</p>
+                <p className="text-[9px] text-[var(--text-muted)]">{editsCount} 条记录</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearEdits}
+                disabled={isClearing || editsCount === 0}
+                className="h-8 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-500/5 px-3 rounded-lg flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3 h-3" />
+                清空记录
+              </Button>
+            </div>
+          </div>
+
           {/* Version Info */}
           <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)]">
             <div className="flex items-center gap-3">

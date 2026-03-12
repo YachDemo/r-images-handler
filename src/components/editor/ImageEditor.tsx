@@ -82,6 +82,9 @@ export function ImageEditor() {
 
     setProcessing(true);
     try {
+      const { saveCurrentEdits } = useEditorStore.getState();
+      
+      // 物理保存图片文件
       await saveEditedImage(
         currentImage.path,
         currentImage.path,
@@ -93,6 +96,14 @@ export function ImageEditor() {
         saturation,
         90
       );
+      
+      // 尝试保存非破坏性编辑历史到 SQLite
+      try {
+        await saveCurrentEdits();
+      } catch (historyError) {
+        console.warn("保存编辑历史记录失败，但图片文件已更新:", historyError);
+      }
+      
       markSaved();
       closeEditor();
     } catch (error) {
@@ -121,6 +132,20 @@ export function ImageEditor() {
         saturation,
         90
       );
+
+      // 为另存为的新文件建立编辑历史
+      try {
+        const { rotation: r, flipH: fh, flipV: fv, brightness: b, contrast: c, saturation: s } = useEditorStore.getState();
+        const { saveEditSequence } = await import("../../services/dbService");
+        const stateToSave = {
+          type: 'fullState',
+          params: { rotation: r, flipH: fh, flipV: fv, brightness: b, contrast: c, saturation: s }
+        };
+        await saveEditSequence(targetPath, [stateToSave]);
+      } catch (historyErr) {
+        console.warn("为另存为的文件创建编辑历史失败:", historyErr);
+      }
+
       markSaved();
       closeEditor();
     } catch (error) {

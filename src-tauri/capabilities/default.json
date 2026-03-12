@@ -10,6 +10,7 @@
     "fs:default",
     "updater:default",
     "process:default",
+    "sql:default",
     {
       "identifier": "fs:allow-read",
       "allow": [{ "path": "**" }]
