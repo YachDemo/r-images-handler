@@ -155,6 +155,7 @@ export async function applyWatermarkPreview(
  * 批量添加水印
  */
 export async function batchWatermark(
+  taskId: string,
   files: string[],
   text: string | null,
   watermarkImage: string | null,
@@ -172,6 +173,7 @@ export async function batchWatermark(
   outputDir?: string
 ): Promise<number> {
   return invoke<number>("batch_watermark", {
+    taskId,
     files,
     text,
     watermarkImage,
@@ -216,21 +218,24 @@ export async function batchRenamePreview(
  * 执行批量重命名
  */
 export async function batchRenameExecute(
+  taskId: string,
   renames: [string, string][]
 ): Promise<number> {
-  return invoke<number>("batch_rename_execute", { renames });
+  return invoke<number>("batch_rename_execute", { taskId, renames });
 }
 
 /**
  * 批量格式转换
  */
 export async function batchConvert(
+  taskId: string,
   files: string[],
   targetFormat: string,
   quality: number,
   outputDir?: string
 ): Promise<number> {
   return invoke<number>("batch_convert", {
+    taskId,
     files,
     targetFormat,
     quality,
@@ -242,6 +247,7 @@ export async function batchConvert(
  * 批量调整尺寸
  */
 export async function batchResize(
+  taskId: string,
   files: string[],
   width: number | null,
   height: number | null,
@@ -249,6 +255,7 @@ export async function batchResize(
   outputDir?: string
 ): Promise<number> {
   return invoke<number>("batch_resize", {
+    taskId,
     files,
     width,
     height,
@@ -296,4 +303,11 @@ export async function revealInExplorer(path: string): Promise<void> {
  */
 export async function deleteFile(path: string): Promise<void> {
   return invoke("delete_file", { path });
+}
+
+/**
+ * 检查路径类型
+ */
+export async function checkPathType(path: string): Promise<"dir" | "file" | "none"> {
+  return invoke<"dir" | "file" | "none">("check_path_type", { path });
 }

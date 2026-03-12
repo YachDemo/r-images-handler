@@ -76,3 +76,13 @@ pub enum EditOperation {
     Resize(ResizeParams),
     AdjustColors(ColorAdjustParams),
 }
+
+/// 批量处理进度载荷
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchProgressPayload {
+    pub task_id: String,
+    pub progress: u32,
+    pub total: u32,
+    pub message: String,
+}

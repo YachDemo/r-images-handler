@@ -48,17 +48,20 @@ interface FileStore {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   toggleFolderExpanded: (rootIndex: number, path: string) => void;
+  refreshKey: number;
+  triggerRefresh: () => void;
 }
 
 export const useFileStore = create<FileStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       rootPaths: [],
       selectedPath: null,
       folderTrees: [],
       images: [],
       isLoading: false,
       error: null,
+      refreshKey: 0,
 
       addRootPath: (path) => set((state) => ({ 
         rootPaths: state.rootPaths.includes(path) ? state.rootPaths : [...state.rootPaths, path],
@@ -77,6 +80,8 @@ export const useFileStore = create<FileStore>()(
       setImages: (images) => set({ images }),
       setLoading: (loading) => set({ isLoading: loading }),
       setError: (error) => set({ error }),
+      
+      triggerRefresh: () => set((state) => ({ refreshKey: state.refreshKey + 1 })),
       
       toggleFolderExpanded: (rootIndex, path) =>
         set((state) => {

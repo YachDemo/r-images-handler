@@ -3,17 +3,18 @@ import { X, Edit3, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
-import { useFileStore, type ImageFileInfo } from "../../stores/fileStore";
-import { batchRenamePreview, batchRenameExecute, listImages } from "../../services/tauriApi";
+import { useFileStore } from "../../stores/fileStore";
+import { batchRenamePreview, batchRenameExecute } from "../../services/tauriApi";
 
 export function BatchRenameDialog() {
-  const { activeDialog, closeDialog, isProcessing, setProcessing } = useBatchStore();
+  const { activeDialog, closeDialog, addTask, updateTask } = useBatchStore();
   const { selectedPaths, clearSelection } = useSelectionStore();
-  const { rootPaths, setImages } = useFileStore();
+  const { triggerRefresh } = useFileStore();
 
   const [pattern, setPattern] = useState("{name}_{n}");
   const [startNumber, setStartNumber] = useState(1);
   const [preview, setPreview] = useState<[string, string][]>([]);
+  const [localIsProcessing, setLocalIsProcessing] = useState(false);
 
   const files = Array.from(selectedPaths);
   const isOpen = activeDialog === "rename";
@@ -36,39 +37,33 @@ export function BatchRenameDialog() {
   const handleExecute = async () => {
     if (preview.length === 0) return;
 
-    setProcessing(true);
+    setLocalIsProcessing(true);
+    const taskId = addTask("rename", preview.length);
+    
     try {
-      const count = await batchRenameExecute(preview);
+      updateTask(taskId, { status: "running", message: "开始重命名..." });
+      const count = await batchRenameExecute(taskId, preview);
 
-      const allNewImages: ImageFileInfo[] = [];
-      for (const path of rootPaths) {
-        try {
-          const imgs = await listImages(path);
-          allNewImages.push(...imgs);
-        } catch (e) {
-          console.error(`刷新目录 ${path} 失败:`, e);
-        }
-      }
-      
-      const uniqueImages: ImageFileInfo[] = [];
-      const seen = new Set();
-      allNewImages.forEach(img => {
-        if (!seen.has(img.path)) {
-          seen.add(img.path);
-          uniqueImages.push(img);
-        }
+      updateTask(taskId, { 
+        status: "completed", 
+        progress: preview.length, 
+        message: `成功重命名 ${count} 个文件`,
+        endTime: Date.now()
       });
-      
-      setImages(uniqueImages);
 
+      triggerRefresh();
       clearSelection();
       closeDialog();
-      // eslint-disable-next-line no-alert
-      alert(`成功重命名 ${count} 个文件`);
     } catch (err) {
       console.error("重命名失败:", err);
+      updateTask(taskId, { 
+        status: "failed", 
+        error: String(err),
+        message: "重命名失败",
+        endTime: Date.now()
+      });
     } finally {
-      setProcessing(false);
+      setLocalIsProcessing(false);
     }
   };
 
@@ -206,11 +201,11 @@ export function BatchRenameDialog() {
           <Button
             variant="primary"
             onClick={handleExecute}
-            disabled={isProcessing || preview.length === 0}
+            disabled={localIsProcessing || preview.length === 0}
             className="px-6 shadow-lg shadow-indigo-500/20"
           >
-            {isProcessing ? "处理中..." : "确认重命名"}
-            {!isProcessing && <CheckCircle2 className="w-3.5 h-3.5 ml-2" />}
+            {localIsProcessing ? "处理中..." : "确认重命名"}
+            {!localIsProcessing && <CheckCircle2 className="w-3.5 h-3.5 ml-2" />}
           </Button>
         </div>
       </div>

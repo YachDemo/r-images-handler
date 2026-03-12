@@ -1,4 +1,9 @@
 import { useEffect } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
+// 暂时移除可能导致崩溃的插件导入进行测试
+// import { ask, message } from "@tauri-apps/plugin-dialog";
+import { checkPathType, deleteFile } from "./services/tauriApi";
 import { MainLayout } from "./components/layout/MainLayout";
 import { QuickPreview } from "./components/preview/QuickPreview";
 import { ImageEditor } from "./components/editor/ImageEditor";
@@ -7,6 +12,7 @@ import { BatchConvertDialog } from "./components/batch/BatchConvertDialog";
 import { BatchResizeDialog } from "./components/batch/BatchResizeDialog";
 import { BatchWatermarkDialog } from "./components/batch/BatchWatermarkDialog";
 import { CollageDialog } from "./components/batch/CollageDialog";
+import { TaskQueue } from "./components/layout/TaskQueue";
 import { useUIStore } from "./stores/uiStore";
 import { useSelectionStore } from "./stores/selectionStore";
 import { useEditorStore } from "./stores/editorStore";
@@ -15,91 +21,192 @@ import { useBatchStore } from "./stores/batchStore";
 
 function App() {
   const { openQuickPreview, isQuickPreviewOpen } = useUIStore();
-  const { selectedPaths, select, lastSelectedPath } = useSelectionStore();
+  const { selectedPaths, select, lastSelectedPath, selectAll, clearSelection } = useSelectionStore();
   const { isEditing, openEditor } = useEditorStore();
-  const { images } = useFileStore();
-  const { activeDialog, closeDialog } = useBatchStore();
+  const { images, addRootPath, setSelectedPath, triggerRefresh } = useFileStore();
+  const { activeDialog, closeDialog, updateTask } = useBatchStore();
+
+  // 监听批量任务进度
+  useEffect(() => {
+    const unlisten = listen<{ taskId: string; progress: number; total: number; message: string }>(
+      "batch-progress",
+      (event) => {
+        const { taskId, progress, total, message } = event.payload;
+        updateTask(taskId, {
+          status: "running",
+          progress,
+          total,
+          message,
+        });
+      }
+    );
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [updateTask]);
+
+  // 监听拖拽事件
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    const setupDragDrop = async () => {
+      try {
+        const window = getCurrentWindow();
+        unlisten = await window.onDragDrop(async (event) => {
+          if (event.payload.type === "drop") {
+            const paths = event.payload.paths;
+            if (paths.length > 0) {
+              let targetFolder = "";
+              for (const path of paths) {
+                try {
+                  const type = await checkPathType(path);
+                  if (type === "dir") {
+                    targetFolder = path;
+                    break;
+                  }
+                } catch (e) {
+                  console.error("Check path type failed:", e);
+                }
+              }
+
+              if (!targetFolder) {
+                const firstPath = paths[0];
+                const lastSep = firstPath.lastIndexOf("/");
+                const lastSepWin = firstPath.lastIndexOf("\\");
+                const sepIndex = Math.max(lastSep, lastSepWin);
+                if (sepIndex !== -1) {
+                  targetFolder = firstPath.substring(0, sepIndex);
+                }
+              }
+
+              if (targetFolder) {
+                addRootPath(targetFolder);
+                setSelectedPath(targetFolder);
+                triggerRefresh();
+              }
+            }
+          }
+        });
+      } catch (err) {
+        console.error("Failed to setup drag drop:", err);
+      }
+    };
+
+    setupDragDrop();
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [addRootPath, setSelectedPath, triggerRefresh]);
 
   // 全局键盘事件
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // 0. 如果快速预览已打开，交由 QuickPreview 处理（防止冲突）
-      if (isQuickPreviewOpen) return;
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      try {
+        if (isQuickPreviewOpen) return;
 
-      // 1. 处理弹窗关闭 (Escape)
-      if (activeDialog) {
-        if (e.key === "Escape") {
+        if (activeDialog) {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            closeDialog();
+          }
+          return;
+        }
+
+        if (isEditing) return;
+
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return;
+        }
+
+        const isMod = e.ctrlKey || e.metaKey;
+
+        if (isMod && e.key === "a") {
           e.preventDefault();
-          closeDialog();
+          const allPaths = images.map(img => img.path);
+          selectAll(allPaths);
         }
-        return; // 弹窗打开时阻止其他快捷键
-      }
 
-      // 2. 如果正在编辑，忽略
-      if (isEditing) return;
-
-      // 3. 如果正在输入，忽略
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      // 4. 空格键打开预览
-      if (e.key === " " && selectedPaths.size === 1) {
-        e.preventDefault();
-        const selectedPath = Array.from(selectedPaths)[0];
-        openQuickPreview(selectedPath);
-      }
-
-      // 5. Enter 键打开编辑器
-      if (e.key === "Enter" && selectedPaths.size === 1) {
-        e.preventDefault();
-        const selectedPath = Array.from(selectedPaths)[0];
-        const image = images.find((img) => img.path === selectedPath);
-        if (image) {
-          openEditor(image);
+        if (isMod && e.key === "c" && selectedPaths.size > 0) {
+          e.preventDefault();
+          const paths = Array.from(selectedPaths).join("\n");
+          await navigator.clipboard.writeText(paths);
         }
-      }
 
-      // 6. 方向键导航
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
-        e.preventDefault();
-        if (images.length === 0) return;
+        if (e.key === "Delete" && selectedPaths.size > 0) {
+          e.preventDefault();
+          const count = selectedPaths.size;
+          // 使用原生 confirm 代替插件进行测试
+          const confirmed = window.confirm(`确定要永久删除这 ${count} 个文件吗？此操作不可撤销。`);
 
-        let newIndex = 0;
-        // 如果没有选中，从第一个开始
-        if (!lastSelectedPath) {
-          newIndex = 0;
-        } else {
-          const currentIndex = images.findIndex(img => img.path === lastSelectedPath);
-          if (currentIndex === -1) {
-             newIndex = 0;
-          } else {
-             // 简单的左右/上下逻辑：上/左=前一个，下/右=后一个
-             if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-               newIndex = Math.max(0, currentIndex - 1);
-             } else {
-               newIndex = Math.min(images.length - 1, currentIndex + 1);
-             }
+          if (confirmed) {
+            for (const path of selectedPaths) {
+              try {
+                await deleteFile(path);
+              } catch (err) {
+                console.error(`Delete failed for ${path}:`, err);
+              }
+            }
+            triggerRefresh();
+            clearSelection();
           }
         }
-        
-        const targetImage = images[newIndex];
-        if (targetImage) {
-           select(targetImage.path);
-           // 滚动到可视区域
-           setTimeout(() => {
-             const element = document.getElementById(`image-card-${targetImage.path}`);
-             if (element) {
-               element.scrollIntoView({ behavior: "smooth", block: "nearest" });
-             }
-           }, 0);
+
+        if (e.key === " " && selectedPaths.size === 1) {
+          e.preventDefault();
+          const selectedPath = Array.from(selectedPaths)[0];
+          openQuickPreview(selectedPath);
         }
+
+        if (e.key === "Enter" && selectedPaths.size === 1) {
+          e.preventDefault();
+          const selectedPath = Array.from(selectedPaths)[0];
+          const image = images.find((img) => img.path === selectedPath);
+          if (image) {
+            openEditor(image);
+          }
+        }
+
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+          e.preventDefault();
+          if (images.length === 0) return;
+
+          let newIndex = 0;
+          if (!lastSelectedPath) {
+            newIndex = 0;
+          } else {
+            const currentIndex = images.findIndex(img => img.path === lastSelectedPath);
+            if (currentIndex === -1) {
+              newIndex = 0;
+            } else {
+              if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                newIndex = Math.max(0, currentIndex - 1);
+              } else {
+                newIndex = Math.min(images.length - 1, currentIndex + 1);
+              }
+            }
+          }
+          
+          const targetImage = images[newIndex];
+          if (targetImage) {
+            select(targetImage.path);
+            setTimeout(() => {
+              const element = document.getElementById(`image-card-${targetImage.path}`);
+              if (element) {
+                element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+              }
+            }, 0);
+          }
+        }
+      } catch (err) {
+        console.error("Keyboard event handler error:", err);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedPaths, lastSelectedPath, openQuickPreview, isQuickPreviewOpen, isEditing, openEditor, images, activeDialog, closeDialog, select]);
+  }, [selectedPaths, lastSelectedPath, openQuickPreview, isQuickPreviewOpen, isEditing, openEditor, images, activeDialog, closeDialog, select, selectAll, clearSelection, triggerRefresh]);
 
   return (
     <>
@@ -111,6 +218,7 @@ function App() {
       <BatchResizeDialog />
       <BatchWatermarkDialog />
       <CollageDialog />
+      <TaskQueue />
     </>
   );
 }

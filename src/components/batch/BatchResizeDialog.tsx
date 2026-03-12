@@ -3,8 +3,8 @@ import { X, Maximize2, Link, Unlink, FolderOpen, ArrowRight, CheckCircle2 } from
 import { Button } from "../ui/Button";
 import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
-import { useFileStore, type ImageFileInfo } from "../../stores/fileStore";
-import { batchResize, selectFolder, listImages } from "../../services/tauriApi";
+import { useFileStore } from "../../stores/fileStore";
+import { batchResize, selectFolder } from "../../services/tauriApi";
 import { cn } from "../../utils/cn";
 
 const PRESETS = [
@@ -15,14 +15,15 @@ const PRESETS = [
 ];
 
 export function BatchResizeDialog() {
-  const { activeDialog, closeDialog, isProcessing, setProcessing } = useBatchStore();
+  const { activeDialog, closeDialog, addTask, updateTask } = useBatchStore();
   const { selectedPaths, clearSelection } = useSelectionStore();
-  const { rootPaths, setImages, images } = useFileStore();
+  const { triggerRefresh, images } = useFileStore();
 
   const [width, setWidth] = useState<number | null>(1920);
   const [height, setHeight] = useState<number | null>(null);
   const [maintainAspect, setMaintainAspect] = useState(true);
   const [outputDir, setOutputDir] = useState<string | null>(null);
+  const [localIsProcessing, setLocalIsProcessing] = useState(false);
 
   const files = Array.from(selectedPaths);
   const isOpen = activeDialog === "resize";
@@ -52,8 +53,7 @@ export function BatchResizeDialog() {
         // 只设置了高度
         newW = Math.round(height * aspect);
       } else if (width && height) {
-        // 都设置了，采取 "Fit Inside" 逻辑 (类似 object-contain)
-        // 这样可以保证不超过任一边界
+        // 都设置了，采取 "Fit Inside" 逻辑
         const scaleW = width / originalW;
         const scaleH = height / originalH;
         const scale = Math.min(scaleW, scaleH);
@@ -62,9 +62,6 @@ export function BatchResizeDialog() {
       }
     }
 
-    // 如果都没有设置，或者只设置了一个且没开启保持比例（未设置的为null? 
-    // 后端通常逻辑：未设置则保持原样，或者如果maintainAspect=false则可能拉伸？
-    // 这里假设未设置的维度保持原样
     if (newW === null) newW = originalW;
     if (newH === null) newH = originalH;
 
@@ -90,10 +87,13 @@ export function BatchResizeDialog() {
   const handleExecute = async () => {
     if (files.length === 0 || (width === null && height === null)) return;
 
-    setProcessing(true);
+    setLocalIsProcessing(true);
+    const taskId = addTask("resize", files.length);
 
     try {
+      updateTask(taskId, { status: "running", message: "开始调整尺寸..." });
       const count = await batchResize(
+        taskId,
         files,
         width,
         height,
@@ -101,34 +101,26 @@ export function BatchResizeDialog() {
         outputDir || undefined
       );
 
-      const allNewImages: ImageFileInfo[] = [];
-      for (const path of rootPaths) {
-        try {
-          const imgs = await listImages(path);
-          allNewImages.push(...imgs);
-        } catch (e) {
-          console.error(`刷新目录 ${path} 失败:`, e);
-        }
-      }
-      
-      const uniqueImages: ImageFileInfo[] = [];
-      const seen = new Set();
-      allNewImages.forEach(img => {
-        if (!seen.has(img.path)) {
-          seen.add(img.path);
-          uniqueImages.push(img);
-        }
+      updateTask(taskId, { 
+        status: "completed", 
+        progress: files.length, 
+        message: `成功调整 ${count} 个文件尺寸`,
+        endTime: Date.now()
       });
-      setImages(uniqueImages);
 
+      triggerRefresh();
       clearSelection();
       closeDialog();
-      // eslint-disable-next-line no-alert
-      alert(`成功调整 ${count} 个文件尺寸`);
     } catch (err) {
       console.error("调整尺寸失败:", err);
+      updateTask(taskId, { 
+        status: "failed", 
+        error: String(err),
+        message: "调整尺寸失败",
+        endTime: Date.now()
+      });
     } finally {
-      setProcessing(false);
+      setLocalIsProcessing(false);
     }
   };
 
@@ -327,11 +319,11 @@ export function BatchResizeDialog() {
           <Button
             variant="primary"
             onClick={handleExecute}
-            disabled={isProcessing || files.length === 0 || (width === null && height === null)}
+            disabled={localIsProcessing || files.length === 0 || (width === null && height === null)}
             className="px-6 shadow-lg shadow-indigo-500/20"
           >
-            {isProcessing ? "处理中..." : "开始调整"}
-            {!isProcessing && <ArrowRight className="w-3.5 h-3.5 ml-2" />}
+            {localIsProcessing ? "处理中..." : "开始调整"}
+            {!localIsProcessing && <ArrowRight className="w-3.5 h-3.5 ml-2" />}
           </Button>
         </div>
       </div>

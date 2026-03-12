@@ -190,13 +190,28 @@ pub async fn batch_rename_preview(
 
 /// 执行批量重命名
 #[tauri::command]
-pub async fn batch_rename_execute(renames: Vec<(String, String)>) -> Result<u32, String> {
-    let mut success_count = 0;
+pub async fn batch_rename_execute(
+    app: tauri::AppHandle,
+    task_id: String,
+    renames: Vec<(String, String)>
+) -> Result<u32, String> {
+    use crate::models::BatchProgressPayload;
+    use tauri::Emitter;
 
-    for (old_path, new_path) in renames {
-        if std::fs::rename(&old_path, &new_path).is_ok() {
+    let mut success_count = 0;
+    let total = renames.len() as u32;
+
+    for (index, (old_path, new_path)) in renames.iter().enumerate() {
+        if std::fs::rename(old_path, new_path).is_ok() {
             success_count += 1;
         }
+
+        let _ = app.emit("batch-progress", BatchProgressPayload {
+            task_id: task_id.clone(),
+            progress: (index + 1) as u32,
+            total,
+            message: format!("正在重命名: {}", Path::new(new_path).file_name().unwrap_or_default().to_string_lossy()),
+        });
     }
 
     Ok(success_count)
@@ -205,11 +220,15 @@ pub async fn batch_rename_execute(renames: Vec<(String, String)>) -> Result<u32,
 /// 批量格式转换
 #[tauri::command]
 pub async fn batch_convert(
+    app: tauri::AppHandle,
+    task_id: String,
     files: Vec<String>,
     target_format: String,
     quality: u8,
     output_dir: Option<String>,
 ) -> Result<u32, String> {
+    use crate::models::BatchProgressPayload;
+    use tauri::Emitter;
     use image::ImageFormat;
 
     let format = match target_format.to_lowercase().as_str() {
@@ -221,9 +240,12 @@ pub async fn batch_convert(
     };
 
     let mut success_count = 0;
+    let total = files.len() as u32;
 
-    for file_path in files {
-        let source = Path::new(&file_path);
+    for (index, file_path) in files.iter().enumerate() {
+        let source = Path::new(file_path);
+        let file_name = source.file_name().unwrap_or_default().to_string_lossy();
+        
         if let Ok(img) = image::open(source) {
             let file_stem = source.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
             let new_name = format!("{}.{}", file_stem, target_format.to_lowercase());
@@ -238,6 +260,13 @@ pub async fn batch_convert(
                 success_count += 1;
             }
         }
+
+        let _ = app.emit("batch-progress", BatchProgressPayload {
+            task_id: task_id.clone(),
+            progress: (index + 1) as u32,
+            total,
+            message: format!("正在转换: {}", file_name),
+        });
     }
 
     Ok(success_count)
@@ -246,16 +275,24 @@ pub async fn batch_convert(
 /// 批量调整尺寸
 #[tauri::command]
 pub async fn batch_resize(
+    app: tauri::AppHandle,
+    task_id: String,
     files: Vec<String>,
     width: Option<u32>,
     height: Option<u32>,
     maintain_aspect: bool,
     output_dir: Option<String>,
 ) -> Result<u32, String> {
-    let mut success_count = 0;
+    use crate::models::BatchProgressPayload;
+    use tauri::Emitter;
 
-    for file_path in files {
-        let source = Path::new(&file_path);
+    let mut success_count = 0;
+    let total = files.len() as u32;
+
+    for (index, file_path) in files.iter().enumerate() {
+        let source = Path::new(file_path);
+        let file_name = source.file_name().unwrap_or_default().to_string_lossy();
+
         if let Ok(img) = image::open(source) {
             let resized = if maintain_aspect {
                 let max_dim = width.unwrap_or(height.unwrap_or(1000));
@@ -277,6 +314,13 @@ pub async fn batch_resize(
                 success_count += 1;
             }
         }
+
+        let _ = app.emit("batch-progress", BatchProgressPayload {
+            task_id: task_id.clone(),
+            progress: (index + 1) as u32,
+            total,
+            message: format!("正在调整尺寸: {}", file_name),
+        });
     }
 
     Ok(success_count)
@@ -510,6 +554,8 @@ pub async fn apply_watermark_preview(
 /// 批量添加水印
 #[tauri::command]
 pub async fn batch_watermark(
+    app: tauri::AppHandle,
+    task_id: String,
     files: Vec<String>,
     text: Option<String>,
     watermark_image: Option<String>,
@@ -526,26 +572,23 @@ pub async fn batch_watermark(
     line_height: f32,
     output_dir: Option<String>,
 ) -> Result<u32, String> {
-    let mut success_count = 0;
+    use crate::models::BatchProgressPayload;
+    use tauri::Emitter;
 
-    for file_path in files {
-        let source = Path::new(&file_path);
+    let mut success_count = 0;
+    let total = files.len() as u32;
+
+    for (index, file_path) in files.iter().enumerate() {
+        let source = Path::new(file_path);
+        let file_name = source.file_name().unwrap_or_default().to_string_lossy();
         
         match image_service::process_watermark(
             source,
             text.clone(),
             watermark_image.clone(),
-            x,
-            y,
-            opacity,
-            size,
-            color.clone(),
-            tiled,
-            gap,
-            angle,
-            font_path.clone(),
-            is_bold,
-            line_height,
+            x, y, opacity, size, color.clone(),
+            tiled, gap, angle, font_path.clone(),
+            is_bold, line_height,
         ) {
             Ok(img) => {
                 let target = if let Some(ref dir) = output_dir {
@@ -561,6 +604,13 @@ pub async fn batch_watermark(
             },
             Err(e) => eprintln!("水印添加失败 {}: {}", file_path, e),
         }
+
+        let _ = app.emit("batch-progress", BatchProgressPayload {
+            task_id: task_id.clone(),
+            progress: (index + 1) as u32,
+            total,
+            message: format!("正在添加水印: {}", file_name),
+        });
     }
     
     Ok(success_count)
@@ -570,4 +620,18 @@ pub async fn batch_watermark(
 #[tauri::command]
 pub async fn delete_file(path: String) -> Result<(), String> {
     std::fs::remove_file(&path).map_err(|e| e.to_string())
+}
+
+/// 检查路径类型
+#[tauri::command]
+pub async fn check_path_type(path: String) -> Result<String, String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Ok("none".to_string());
+    }
+    if p.is_dir() {
+        Ok("dir".to_string())
+    } else {
+        Ok("file".to_string())
+    }
 }

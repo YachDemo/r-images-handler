@@ -4,8 +4,8 @@ import { Button } from "../ui/Button";
 import { Slider } from "../ui/Slider";
 import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
-import { useFileStore, type ImageFileInfo } from "../../stores/fileStore";
-import { batchConvert, selectFolder, listImages } from "../../services/tauriApi";
+import { useFileStore } from "../../stores/fileStore";
+import { batchConvert, selectFolder } from "../../services/tauriApi";
 import { cn } from "../../utils/cn";
 
 const FORMATS = [
@@ -16,13 +16,14 @@ const FORMATS = [
 ];
 
 export function BatchConvertDialog() {
-  const { activeDialog, closeDialog, isProcessing, setProcessing } = useBatchStore();
+  const { activeDialog, closeDialog, addTask, updateTask } = useBatchStore();
   const { selectedPaths, clearSelection } = useSelectionStore();
-  const { rootPaths, setImages } = useFileStore();
+  const { triggerRefresh } = useFileStore();
 
   const [targetFormat, setTargetFormat] = useState("jpg");
   const [quality, setQuality] = useState(85);
   const [outputDir, setOutputDir] = useState<string | null>(null);
+  const [localIsProcessing, setLocalIsProcessing] = useState(false);
 
   const files = Array.from(selectedPaths);
   const isOpen = activeDialog === "convert";
@@ -41,39 +42,33 @@ export function BatchConvertDialog() {
   const handleExecute = async () => {
     if (files.length === 0) return;
 
-    setProcessing(true);
+    setLocalIsProcessing(true);
+    const taskId = addTask("convert", files.length);
 
     try {
-      const count = await batchConvert(files, targetFormat, quality, outputDir || undefined);
+      updateTask(taskId, { status: "running", message: "开始转换格式..." });
+      const count = await batchConvert(taskId, files, targetFormat, quality, outputDir || undefined);
 
-      const allNewImages = [];
-      for (const path of rootPaths) {
-        try {
-          const imgs = await listImages(path);
-          allNewImages.push(...imgs);
-        } catch (e) {
-          console.error(`刷新目录 ${path} 失败:`, e);
-        }
-      }
-      
-      const uniqueImages: ImageFileInfo[] = [];
-      const seen = new Set();
-      allNewImages.forEach(img => {
-        if (!seen.has(img.path)) {
-          seen.add(img.path);
-          uniqueImages.push(img);
-        }
+      updateTask(taskId, { 
+        status: "completed", 
+        progress: files.length, 
+        message: `成功转换 ${count} 个文件`,
+        endTime: Date.now()
       });
-      setImages(uniqueImages);
 
+      triggerRefresh();
       clearSelection();
       closeDialog();
-      // eslint-disable-next-line no-alert
-      alert(`成功转换 ${count} 个文件`);
     } catch (err) {
       console.error("转换失败:", err);
+      updateTask(taskId, { 
+        status: "failed", 
+        error: String(err),
+        message: "转换失败",
+        endTime: Date.now()
+      });
     } finally {
-      setProcessing(false);
+      setLocalIsProcessing(false);
     }
   };
 
@@ -222,11 +217,11 @@ export function BatchConvertDialog() {
           <Button
             variant="primary"
             onClick={handleExecute}
-            disabled={isProcessing || files.length === 0}
+            disabled={localIsProcessing || files.length === 0}
             className="px-6 shadow-lg shadow-indigo-500/20"
           >
-            {isProcessing ? "处理中..." : "开始转换"}
-            {!isProcessing && <ArrowRight className="w-3.5 h-3.5 ml-2" />}
+            {localIsProcessing ? "处理中..." : "开始转换"}
+            {!localIsProcessing && <ArrowRight className="w-3.5 h-3.5 ml-2" />}
           </Button>
         </div>
       </div>

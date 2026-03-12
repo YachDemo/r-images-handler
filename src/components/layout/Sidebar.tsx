@@ -20,7 +20,8 @@ export function Sidebar({ width }: { width: number }) {
     setImages, 
     setLoading, 
     selectedPath,
-    setSelectedPath 
+    setSelectedPath,
+    refreshKey
   } = useFileStore();
 
   // Collapsible state for sections
@@ -48,7 +49,7 @@ export function Sidebar({ width }: { width: number }) {
     
     restoreState();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, [refreshKey]); 
 
   const handleOpenPath = async (path: string, force = false) => {
     // If it's a file path (naive check), get parent dir

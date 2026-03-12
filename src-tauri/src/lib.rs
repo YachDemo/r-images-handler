@@ -7,7 +7,7 @@ use commands::{
     get_thumbnail, select_folder, select_files, cleanup_thumbnail_cache,
     apply_edits_preview, save_edited_image, select_save_path, get_home_dir,
     batch_rename_preview, batch_rename_execute, batch_convert, batch_resize,
-    create_collage, reveal_in_explorer, delete_file,
+    create_collage, reveal_in_explorer, delete_file, check_path_type,
     apply_watermark_preview, batch_watermark, get_system_fonts
 };
 
@@ -36,6 +36,7 @@ pub fn run() {
             create_collage,
             reveal_in_explorer,
             delete_file,
+            check_path_type,
             apply_watermark_preview,
             batch_watermark,
             get_system_fonts

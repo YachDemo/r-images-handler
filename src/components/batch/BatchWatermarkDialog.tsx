@@ -5,7 +5,7 @@ import { Slider } from "../ui/Slider";
 import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
 import { useFileStore } from "../../stores/fileStore";
-import { applyWatermarkPreview, batchWatermark, listImages, getSystemFonts } from "../../services/tauriApi";
+import { applyWatermarkPreview, batchWatermark, getSystemFonts } from "../../services/tauriApi";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { selectFiles } from "../../services/tauriApi";
 import { cn } from "../../utils/cn";
@@ -19,9 +19,9 @@ const FONTS = [
 ];
 
 export function BatchWatermarkDialog() {
-  const { activeDialog, closeDialog, isProcessing, setProcessing } = useBatchStore();
+  const { activeDialog, closeDialog, addTask, updateTask } = useBatchStore();
   const { selectedPaths, clearSelection } = useSelectionStore();
-  const { rootPaths, setImages } = useFileStore();
+  const { triggerRefresh } = useFileStore();
 
   const files = useMemo(() => Array.from(selectedPaths), [selectedPaths]);
   const isOpen = activeDialog === "watermark";
@@ -37,6 +37,7 @@ export function BatchWatermarkDialog() {
   const [angle, setAngle] = useState(0);
   const [isBold, setIsBold] = useState(false);
   const [lineHeight, setLineHeight] = useState(1.2);
+  const [localIsProcessing, setLocalIsProcessing] = useState(false);
   
   // Font list
   const [fonts, setFonts] = useState(FONTS);
@@ -62,7 +63,6 @@ export function BatchWatermarkDialog() {
     getSystemFonts().then(sysFonts => {
       if (sysFonts && sysFonts.length > 0) {
         const sysFontOptions = sysFonts.map(f => ({ label: f, value: f }));
-        // Remove duplicates and merge
         const uniqueFonts = [...FONTS, ...sysFontOptions].filter((v, i, a) => a.findIndex(t => t.value === v.value) === i);
         setFonts(uniqueFonts);
       }
@@ -122,9 +122,13 @@ export function BatchWatermarkDialog() {
 
   const handleExecute = async () => {
     if (files.length === 0) return;
-    setProcessing(true);
+    setLocalIsProcessing(true);
+    const taskId = addTask("watermark", files.length);
+
     try {
+      updateTask(taskId, { status: "running", message: "开始添加水印..." });
       const count = await batchWatermark(
+        taskId,
         files,
         mode === "text" ? text : null,
         mode === "image" ? watermarkImage : null,
@@ -142,24 +146,27 @@ export function BatchWatermarkDialog() {
         undefined
       );
       
-      const allNewImages = [];
-      for (const path of rootPaths) {
-        try {
-          const imgs = await listImages(path);
-          allNewImages.push(...imgs);
-        } catch (e) { console.error(e); }
-      }
-      setImages(allNewImages);
+      updateTask(taskId, { 
+        status: "completed", 
+        progress: files.length, 
+        message: `成功处理 ${count} 张图片`,
+        endTime: Date.now()
+      });
 
+      triggerRefresh();
       clearSelection();
       closeDialog();
-      // eslint-disable-next-line no-alert
-      alert(`成功处理 ${count} 张图片`);
-    } catch (e) {
-      // eslint-disable-next-line no-alert
-      alert(`失败: ${e}`);
+    } catch (err) {
+      console.error("水印添加失败:", err);
+      updateTask(taskId, { 
+        status: "failed", 
+        error: String(err),
+        message: "水印添加失败",
+        endTime: Date.now()
+      });
+    } finally {
+      setLocalIsProcessing(false);
     }
-    setProcessing(false);
   };
 
   // Drag Handlers
@@ -283,7 +290,7 @@ export function BatchWatermarkDialog() {
                       onClick={() => setIsBold(!isBold)}
                       className={cn(
                         "h-10 px-3 rounded-lg border text-xs font-bold transition-all",
-                        isBold ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        isBold ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       )}
                       title="加粗"
                     >
@@ -434,8 +441,8 @@ export function BatchWatermarkDialog() {
         {/* Footer */}
         <div className="p-6 border-t border-[var(--border-subtle)] flex items-center justify-end gap-4 bg-[var(--bg-app)]/50">
           <Button variant="ghost" onClick={closeDialog}>取消</Button>
-          <Button variant="primary" onClick={handleExecute} disabled={isProcessing} className="shadow-lg shadow-[var(--accent)]/20 px-8">
-            {isProcessing ? "处理中..." : "开始批量添加"}
+          <Button variant="primary" onClick={handleExecute} disabled={localIsProcessing} className="shadow-lg shadow-[var(--accent)]/20 px-8">
+            {localIsProcessing ? "处理中..." : "开始批量添加"}
           </Button>
         </div>
       </div>
