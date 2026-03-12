@@ -1,7 +1,7 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   X, Save, Download, RotateCcw, RotateCw,
-  FlipHorizontal, FlipVertical, RefreshCw, Loader2
+  FlipHorizontal, FlipVertical, RefreshCw, Loader2, AlertCircle
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { ColorSliders } from "./ColorSliders";
@@ -33,13 +33,23 @@ export function ImageEditor() {
     markSaved,
   } = useEditorStore();
 
+  const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<number | null>(null);
+
+  const canEdit = currentImage?.supportsEditing !== false;
 
   // 实时预览更新
   const updatePreview = useCallback(async () => {
     if (!currentImage) return;
 
+    // 如果是不支持编辑的格式，直接显示缩略图作为预览，不调用 applyEditsPreview
+    if (!canEdit) {
+      setPreviewUrl(currentImage.thumbnailPath);
+      return;
+    }
+
     setProcessing(true);
+    setError(null);
     try {
       const preview = await applyEditsPreview(
         currentImage.path,
@@ -51,11 +61,12 @@ export function ImageEditor() {
         saturation
       );
       setPreviewUrl(preview);
-    } catch (error) {
-      console.error("预览更新失败:", error);
+    } catch (err: any) {
+      console.error("预览更新失败:", err);
+      setError(err?.message || String(err));
     }
     setProcessing(false);
-  }, [currentImage, rotation, flipH, flipV, brightness, contrast, saturation, setPreviewUrl, setProcessing]);
+  }, [currentImage, canEdit, rotation, flipH, flipV, brightness, contrast, saturation, setPreviewUrl, setProcessing]);
 
   // 防抖更新预览
   useEffect(() => {
@@ -194,11 +205,11 @@ export function ImageEditor() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={handleSaveAs} disabled={isProcessing}>
+          <Button variant="ghost" onClick={handleSaveAs} disabled={isProcessing || !canEdit}>
             <Download className="w-4 h-4 mr-2" />
             另存为
           </Button>
-          <Button variant="primary" onClick={handleSave} disabled={isProcessing || !hasChanges}>
+          <Button variant="primary" onClick={handleSave} disabled={isProcessing || !hasChanges || !canEdit}>
             {isProcessing ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
@@ -212,7 +223,10 @@ export function ImageEditor() {
       {/* 主体内容 */}
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧工具栏 */}
-        <aside className="w-20 bg-[var(--md-sys-color-surface-container-low)] border-r border-[var(--md-sys-color-outline-variant)]/30 flex flex-col items-center py-6 gap-3">
+        <aside className={cn(
+          "w-20 bg-[var(--md-sys-color-surface-container-low)] border-r border-[var(--md-sys-color-outline-variant)]/30 flex flex-col items-center py-6 gap-3",
+          !canEdit && "opacity-50 pointer-events-none grayscale-[0.5]"
+        )}>
           <ToolButton
             icon={RotateCcw}
             label="左转"
@@ -250,24 +264,62 @@ export function ImageEditor() {
         </aside>
 
         {/* 中央画布 */}
-        <main className="flex-1 flex items-center justify-center p-8 bg-[var(--md-sys-color-surface-container-high)]">
+        <main className="flex-1 flex flex-col items-center justify-center p-8 bg-[var(--md-sys-color-surface-container-high)]">
           <div className="relative max-w-full max-h-full">
             {isProcessing && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg z-10 backdrop-blur-sm">
                 <Loader2 className="w-10 h-10 text-[var(--md-sys-color-primary)] animate-spin" />
               </div>
             )}
-            <img
-              src={previewUrl || ""}
-              alt={currentImage.name}
-              className="max-w-full max-h-[calc(100vh-200px)] object-contain rounded-lg shadow-2xl"
-              draggable={false}
-            />
+            
+            {error ? (
+              <div className="flex flex-col items-center gap-4 text-[var(--md-sys-color-on-surface-variant)] p-8 max-w-md text-center bg-[var(--md-sys-color-surface-container)] rounded-2xl border border-[var(--md-sys-color-outline-variant)] shadow-xl">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--md-sys-color-on-surface)] mb-1">预览加载失败</h3>
+                  <p className="text-xs opacity-70 leading-relaxed">{error}</p>
+                </div>
+              </div>
+            ) : !canEdit ? (
+              <div className="flex flex-col items-center gap-6 text-center">
+                <div className="relative">
+                  <img
+                    src={previewUrl || ""}
+                    alt={currentImage.name}
+                    className="max-w-full max-h-[calc(100vh-300px)] object-contain rounded-lg shadow-2xl opacity-40 grayscale-[0.3]"
+                    draggable={false}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="bg-black/60 backdrop-blur-md text-white px-6 py-4 rounded-2xl border border-white/20 shadow-2xl flex flex-col items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                        <AlertCircle className="w-5 h-5 text-[var(--accent)]" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider mb-1">受限格式</h4>
+                        <p className="text-[10px] opacity-80">{currentImage.extension.toUpperCase()} 目前仅支持属性与元数据预览</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <img
+                src={previewUrl || ""}
+                alt={currentImage.name}
+                className="max-w-full max-h-[calc(100vh-200px)] object-contain rounded-lg shadow-2xl transition-all duration-300"
+                draggable={false}
+              />
+            )}
           </div>
         </main>
 
         {/* 右侧调整面板 */}
-        <aside className="w-80 bg-[var(--md-sys-color-surface-container-low)] border-l border-[var(--md-sys-color-outline-variant)]/30 p-6 overflow-y-auto">
+        <aside className={cn(
+          "w-80 bg-[var(--md-sys-color-surface-container-low)] border-l border-[var(--md-sys-color-outline-variant)]/30 p-6 overflow-y-auto",
+          !canEdit && "opacity-50 pointer-events-none grayscale-[0.5]"
+        )}>
           <ColorSliders />
 
           {/* 当前参数显示 */}

@@ -38,6 +38,9 @@ font-kit = "0.11"
 # 并行处理
 rayon = "1.10"
 
+# RAW 支持 (纯 Rust 实现，跨平台)
+rawloader = "0.37"
+
 # 文件系统
 walkdir = "2.5"
 notify = "6.1"
@@ -52,4 +55,3 @@ md5 = "0.7"
 chrono = "0.4"
 thiserror = "1.0"
 dirs = "5.0"
-

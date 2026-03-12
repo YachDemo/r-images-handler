@@ -38,6 +38,7 @@ pub struct ImageFileInfo {
     pub thumbnail_path: Option<String>,
     pub exif: Option<ExifInfo>,
     pub hash: Option<String>,
+    pub supports_editing: bool,
 }
 
 /// 裁剪参数

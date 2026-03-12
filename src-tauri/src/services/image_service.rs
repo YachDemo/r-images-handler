@@ -1,5 +1,5 @@
 use std::path::Path;
-use image::{DynamicImage, ImageFormat, imageops, Rgba, GenericImageView};
+use image::{DynamicImage, ImageFormat, imageops, Rgba, GenericImageView, RgbImage};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use std::io::Cursor;
 use ab_glyph::{FontRef, Font, PxScale, ScaleFont};
@@ -8,6 +8,7 @@ use imageproc::geometric_transformations::{rotate_about_center, Interpolation};
 use font_kit::source::SystemSource;
 use font_kit::family_name::FamilyName;
 use font_kit::properties::Properties;
+use rawloader;
 
 /// 加载字体
 pub fn load_font(custom_path_or_name: Option<&str>) -> Option<Vec<u8>> {
@@ -48,9 +49,37 @@ pub fn load_font(custom_path_or_name: Option<&str>) -> Option<Vec<u8>> {
     None
 }
 
-/// 加载图片
+/// 加载图片 (支持常规、RAW、占位 HEIC)
 pub fn load_image(path: &Path) -> Result<DynamicImage, String> {
-    image::open(path).map_err(|e| format!("无法打开图片: {}", e))
+    let extension = path.extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match extension.as_str() {
+        // 对于 RAW 格式使用 rawloader
+        "arw" | "cr2" | "cr3" | "nef" | "dng" | "orf" | "raf" | "rw2" => load_raw_image(path),
+        // 对于 HEIC 暂时返回占位符或尝试读取
+        "heic" | "heif" => Err(format!("当前跨平台模式暂不支持 HEIC 解码，请考虑转换为 JPG 后再编辑。")),
+        _ => image::open(path).map_err(|e| format!("无法打开图片 ({}): {}", extension, e))
+    }
+}
+
+/// 处理 RAW 格式 (利用纯 Rust 实现的 rawloader)
+fn load_raw_image(path: &Path) -> Result<DynamicImage, String> {
+    let path_str = path.to_str().ok_or("无效路径")?;
+    
+    // 我们尝试读取 RAW 的内容
+    match rawloader::decode_file(path_str) {
+        Ok(raw) => {
+            // 注意：rawloader 输出的是 16bit 的原始 CFA 像素。
+            // 彻底进行 Demosaic 开发并输出 DynamicImage 是一项重型任务。
+            // 这里我们告知用户，虽然成功识别并读取了相机型号 ({})，但目前仅支持元数据预览。
+            // 建议：后续可考虑使用 ImageMagick Sidecar 获取更好的 RAW 体验。
+            Err(format!("成功识别 RAW (相机型号: {})。完整解码与预览提取功能开发中。", raw.model))
+        }
+        Err(e) => Err(format!("RAW 解析失败: {:?}", e))
+    }
 }
 
 /// 变量替换
@@ -390,7 +419,6 @@ pub fn apply_watermark(
     apply_watermark_scaled(path, text, watermark_image, x_ratio, y_ratio, opacity, size, color, tiled, gap, angle, font_path, is_bold, line_height)
 }
 
-// ... Rest of file ...
 pub fn rotate_image(path: &Path, degrees: i32) -> Result<String, String> {
     let img = load_image(path)?;
     let rotated = match degrees { 90 | -270 => img.rotate90(), 180 | -180 => img.rotate180(), 270 | -90 => img.rotate270(), _ => img };

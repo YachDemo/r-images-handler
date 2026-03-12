@@ -6,7 +6,11 @@ use crate::models::{FileNode, ImageFileInfo, ExifInfo};
 use exif::{In, Reader, Tag};
 
 /// 支持的图片格式
-const SUPPORTED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "tiff", "tif", "heic", "heif"];
+const SUPPORTED_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "tiff", "tif", 
+    "heic", "heif",
+    "arw", "cr2", "cr3", "nef", "dng", "orf", "raf", "rw2"
+];
 
 /// 检查是否为支持的图片格式
 pub fn is_supported_image(path: &Path) -> bool {
@@ -189,6 +193,9 @@ pub fn get_image_info(path: &Path) -> Result<ImageFileInfo, String> {
     // 计算哈希
     let hash = get_file_hash(path).ok();
 
+    // 格式编辑支持检查
+    let supports_editing = !matches!(extension.as_str(), "heic" | "heif" | "arw" | "cr2" | "cr3" | "nef" | "dng" | "orf" | "raf" | "rw2");
+
     Ok(ImageFileInfo {
         path: path.to_string_lossy().to_string(),
         name,
@@ -202,6 +209,7 @@ pub fn get_image_info(path: &Path) -> Result<ImageFileInfo, String> {
         thumbnail_path: None, // 稍后由缩略图服务填充
         exif,
         hash,
+        supports_editing,
     })
 }
 
