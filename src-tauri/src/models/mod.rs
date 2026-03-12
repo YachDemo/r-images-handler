@@ -116,3 +116,16 @@ pub struct HistogramData {
     pub b: Vec<u32>,
     pub l: Vec<u32>,
 }
+
+/// 拼图单张图片参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CollageImageParams {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub zoom: f32,
+    pub offset_x: f32,
+    pub offset_y: f32,
+}

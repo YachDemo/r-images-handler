@@ -1,25 +1,20 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Loader2, LayoutGrid, Settings2, Type, Trash2, Baseline, Sparkles } from "lucide-react";
+import { X, Loader2, LayoutGrid, Settings2, Type, Trash2, Baseline, Sparkles, Maximize2 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Slider } from "../ui/Slider";
 import { useBatchStore } from "../../stores/batchStore";
 import { useSelectionStore } from "../../stores/selectionStore";
-import { createCollage, selectSavePath, type TextOverlay } from "../../services/tauriApi";
+import { createCollage, selectSavePath, type TextOverlay, type CollageImageParams } from "../../services/tauriApi";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { cn } from "../../utils/cn";
 
-interface ImageLayout {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+interface ImageLayout extends CollageImageParams {}
 
 interface CollageTemplate {
   id: string;
   name: string;
   aspectRatio: number;
-  getLayout: () => ImageLayout[];
+  getLayout: () => Omit<CollageImageParams, 'zoom' | 'offsetX' | 'offsetY'>[];
 }
 
 const TEXT_PRESETS: { name: string; style: Partial<TextOverlay> }[] = [
@@ -120,6 +115,7 @@ export function CollageDialog() {
   const [bgColor, setBgColor] = useState("#1e1e1e");
   const [layouts, setLayouts] = useState<ImageLayout[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [editMode, setEditMode] = useState<"layout" | "content">("layout");
   
   const [isProcessing, setProcessing] = useState(false);
   const [customWidth, setCustomWidth] = useState(2400);
@@ -144,8 +140,14 @@ export function CollageDialog() {
 
   useEffect(() => {
     if (selectedTemplate) {
-      const newLayouts = selectedTemplate.getLayout();
-      setLayouts(newLayouts.slice(0, files.length));
+      const templateLayouts = selectedTemplate.getLayout().slice(0, files.length);
+      const newLayouts: ImageLayout[] = templateLayouts.map(l => ({
+        ...l,
+        zoom: 1.0,
+        offsetX: 0,
+        offsetY: 0
+      }));
+      setLayouts(newLayouts);
       setSelectedIndex(null);
     }
   }, [selectedTemplate, files.length]);
@@ -170,14 +172,20 @@ export function CollageDialog() {
       return;
     }
 
-    if (selectedTemplate?.id !== "free") return;
     setSelectedIndex(index);
     setSelectedTextIndex(null);
+
+    // 模式切换逻辑：显式区分布局调整与内容滑动
+    let finalType = type;
+    if (editMode === "content" && type === "move") {
+      finalType = "content-move";
+    }
+
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
       startLayout: { ...layouts[index] },
-      type,
+      type: finalType,
     };
   };
 
@@ -200,7 +208,7 @@ export function CollageDialog() {
       return;
     }
 
-    if (selectedTemplate?.id !== "free" || selectedIndex === null) return;
+    if (selectedIndex === null) return;
 
     const newLayouts = [...layouts];
     const start = dragRef.current.startLayout!;
@@ -209,10 +217,24 @@ export function CollageDialog() {
 
     const minSize = 5;
 
-    if (type === "move") {
+    if (type === "content-move") {
+      // 优化：顺滑位移算法 (1:1 跟随鼠标)
+      // 计算鼠标相对于当前图片框架的位移百分比
+      const frameWidthPct = layout.width / 100;
+      const frameHeightPct = layout.height / 100;
+      
+      layout.offsetX = (start.offsetX || 0) + (deltaX / frameWidthPct);
+      layout.offsetY = (start.offsetY || 0) + (deltaY / frameHeightPct);
+      
+      // 保持精度
+      layout.offsetX = Math.round(layout.offsetX * 100) / 100;
+      layout.offsetY = Math.round(layout.offsetY * 100) / 100;
+    } else if (type === "move") {
+      if (selectedTemplate?.id !== "free") return;
       layout.x = Math.max(0, Math.min(100 - layout.width, start.x + deltaX));
       layout.y = Math.max(0, Math.min(100 - layout.height, start.y + deltaY));
     } else {
+      if (selectedTemplate?.id !== "free") return;
       if (type.includes("e")) {
         layout.width = Math.max(minSize, Math.min(100 - layout.x, start.width + deltaX));
       }
@@ -239,6 +261,36 @@ export function CollageDialog() {
 
   const handleMouseUp = () => {
     dragRef.current = null;
+  };
+
+  // 滚轮缩放逻辑 (支持图片内容缩放与文字大小缩放)
+  const handleWheel = (e: React.WheelEvent, index: number, targetType: 'image' | 'text' = 'image') => {
+    // 阻止外层滚动
+    e.stopPropagation();
+    const delta = -e.deltaY;
+
+    if (targetType === 'image') {
+      if (selectedIndex !== index || editMode !== "content") return;
+      const step = 0.05; 
+      const speed = delta > 0 ? step : -step;
+      const newLayouts = [...layouts];
+      const layout = { ...newLayouts[index] };
+      const currentZoom = layout.zoom || 1;
+      const nextZoom = Math.max(1, Math.min(5, currentZoom + speed));
+      layout.zoom = Math.round(nextZoom * 100) / 100;
+      newLayouts[index] = layout;
+      setLayouts(newLayouts);
+    } else {
+      // 文字大小调节
+      if (selectedTextIndex !== index) return;
+      const step = 8; // 字号步长
+      const speed = delta > 0 ? step : -step;
+      const newTexts = [...textOverlays];
+      const textItem = { ...newTexts[index] };
+      textItem.size = Math.max(20, Math.min(1000, textItem.size + speed));
+      newTexts[index] = textItem;
+      setTextOverlays(newTexts);
+    }
   };
 
   const addTextOverlay = (preset?: Partial<TextOverlay>) => {
@@ -292,9 +344,7 @@ export function CollageDialog() {
         canvasHeight = ar >= 1 ? Math.round(baseSize / ar) : baseSize;
       }
 
-      const layoutData: [number, number, number, number][] = layouts.map((l) => [l.x, l.y, l.width, l.height]);
-
-      await createCollage(files, layoutData, textOverlays, canvasWidth, canvasHeight, spacing, borderRadius, canvasBorderRadius, bgColor, outputPath);
+      await createCollage(files, layouts, textOverlays, canvasWidth, canvasHeight, spacing, borderRadius, canvasBorderRadius, bgColor, outputPath);
       clearSelection();
       closeDialog();
       alert(`拼图已保存到: ${outputPath}`);
@@ -412,26 +462,77 @@ export function CollageDialog() {
                     height: `${layout.height}%`,
                     padding: spacing / 2,
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedIndex(index);
-                    setSelectedTextIndex(null);
-                  }}
+                  onMouseDown={(e) => handleMouseDown(e, index, "move")}
+                  onClick={(e) => e.stopPropagation()}
+                  onWheel={(e) => handleWheel(e, index)}
                 >
                   <div
                     className={cn(
-                      "relative w-full h-full overflow-hidden group bg-[var(--bg-surface-hover)] transition-all border-2",
-                      selectedIndex === index ? "border-[var(--accent)] shadow-lg" : "border-transparent",
-                      selectedTemplate.id === "free" ? "cursor-move" : ""
+                      "relative w-full h-full overflow-hidden group transition-all",
+                      selectedIndex === index ? "shadow-2xl z-10" : "ring-0"
                     )}
-                    style={{ borderRadius: borderRadius }}
+                    style={{ 
+                      borderRadius: borderRadius,
+                      backgroundColor: bgColor, // 关键修复：确保滑动图片露出的底色与画布底色一致
+                      cursor: editMode === "content" 
+                        ? (dragRef.current?.type === "content-move" ? "grabbing" : "grab")
+                        : (selectedTemplate.id === "free" ? "move" : "pointer")
+                    }}
                   >
                     <img
                       src={convertFileSrc(files[index])}
                       alt={`Image ${index + 1}`}
-                      className="w-full h-full object-cover"
+                      className={cn(
+                        "w-full h-full object-cover pointer-events-none",
+                        dragRef.current?.type !== "content-move" && "transition-transform duration-200"
+                      )}
+                      style={{ 
+                        transform: `scale(${layout.zoom || 1}) translate(${layout.offsetX || 0}%, ${layout.offsetY || 0}%)` 
+                      }}
                       draggable={false}
                     />
+
+                    {/* 选中高亮边框层 - 高对比度三明治结构，确保在任何背景下可见 */}
+                    {selectedIndex === index && (
+                      <div 
+                        className="absolute inset-0 pointer-events-none z-30 animate-in zoom-in-95 duration-150"
+                        style={{ 
+                          borderRadius: borderRadius,
+                          boxShadow: `
+                            inset 0 0 0 3px #3b82f6,
+                            inset 0 0 0 4px rgba(255,255,255,0.8),
+                            0 0 12px rgba(0,0,0,0.6)
+                          `
+                        }}
+                      />
+                    )}
+
+                    {/* 自由布局下的缩放手柄 - 仅在布局模式下显示 */}
+                    {selectedTemplate.id === "free" && selectedIndex === index && editMode === "layout" && (
+                      <>
+                        <div 
+                          className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-20 group-hover:bg-[var(--accent)]/20" 
+                          onMouseDown={(e) => handleMouseDown(e, index, "resize-nw")}
+                        />
+                        <div 
+                          className="absolute top-0 right-0 w-4 h-4 cursor-ne-resize z-20 group-hover:bg-[var(--accent)]/20" 
+                          onMouseDown={(e) => handleMouseDown(e, index, "resize-ne")}
+                        />
+                        <div 
+                          className="absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize z-20 group-hover:bg-[var(--accent)]/20" 
+                          onMouseDown={(e) => handleMouseDown(e, index, "resize-sw")}
+                        />
+                        <div 
+                          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-20 group-hover:bg-[var(--accent)]/20" 
+                          onMouseDown={(e) => handleMouseDown(e, index, "resize-se")}
+                        />
+                        {/* 四个角的小视觉点 */}
+                        <div className="absolute top-1 left-1 w-1.5 h-1.5 bg-white rounded-full border border-[var(--accent)] pointer-events-none" />
+                        <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-white rounded-full border border-[var(--accent)] pointer-events-none" />
+                        <div className="absolute bottom-1 left-1 w-1.5 h-1.5 bg-white rounded-full border border-[var(--accent)] pointer-events-none" />
+                        <div className="absolute bottom-1 right-1 w-1.5 h-1.5 bg-white rounded-full border border-[var(--accent)] pointer-events-none" />
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -454,8 +555,9 @@ export function CollageDialog() {
                   <div
                     key={`text-${index}`}
                     className={cn(
-                      "absolute cursor-move select-none transition-all",
-                      isSelected ? "ring-2 ring-[var(--accent)] ring-offset-4 ring-offset-transparent z-20" : "z-15"
+                      "absolute select-none",
+                      dragRef.current?.type !== "text-move" && "transition-all duration-200",
+                      isSelected ? "ring-2 ring-blue-500 ring-offset-4 ring-offset-transparent z-20" : "z-15"
                     )}
                     style={{
                       left: `${text.x}%`,
@@ -466,11 +568,13 @@ export function CollageDialog() {
                       opacity: text.opacity,
                       whiteSpace: 'nowrap',
                       textShadow: shadowStyle,
-                      boxShadow: strokeStyle, // 简单模拟描边
+                      boxShadow: strokeStyle, 
                       backgroundColor: text.bgColor || 'transparent',
                       padding: text.bgPadding ? `${text.bgPadding * (displaySize/text.size)}px` : 0,
+                      cursor: isSelected && dragRef.current?.type === "text-move" ? "grabbing" : "grab"
                     }}
                     onMouseDown={(e) => handleMouseDown(e, index, "text-move")}
+                    onWheel={(e) => handleWheel(e, index, 'text')}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedTextIndex(index);
@@ -486,8 +590,11 @@ export function CollageDialog() {
           </div>
 
           {/* 右侧：设置面板 */}
-          <div className="w-[300px] flex flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-app)]/50">
-            {/* Tabs */}
+          <div 
+            className="w-[300px] flex flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-app)]/50"
+            onClick={(e) => e.stopPropagation()} // 防止点击侧边栏导致画布失去焦点
+          >
+            {/* 全局 Tab 切换 (布局 / 艺术字) */}
             <div className="flex p-2 gap-1 border-b border-[var(--border-subtle)]">
               <button
                 onClick={() => setRightPanelTab("layout")}
@@ -511,9 +618,66 @@ export function CollageDialog() {
               </button>
             </div>
 
+            {/* 持久化：针对选中图片的模式切换器 */}
+            {selectedIndex !== null && (
+              <div className="px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/30 space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider">图片交互模式</span>
+                  <span className="text-[9px] text-[var(--text-muted)] italic">#{selectedIndex + 1} 已选中</span>
+                </div>
+                <div className="flex bg-[var(--bg-app)] p-1 rounded-lg border border-[var(--border-subtle)]">
+                  <button
+                    onClick={() => setEditMode("layout")}
+                    className={cn(
+                      "flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all",
+                      editMode === "layout" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    )}
+                  >
+                    调整外框
+                  </button>
+                  <button
+                    onClick={() => setEditMode("content")}
+                    className={cn(
+                      "flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all",
+                      editMode === "content" ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    )}
+                  >
+                    调节内容
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto p-6 space-y-7">
               {rightPanelTab === "layout" ? (
                 <>
+                  {/* 如果是内容模式，在此显示缩放滑块 */}
+                  {selectedIndex !== null && editMode === "content" && (
+                    <div className="p-4 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/20 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-center gap-2 text-[var(--accent)] mb-1">
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">内容细节调节</span>
+                      </div>
+                      <Slider 
+                        label="缩放倍数" 
+                        value={Math.round((layouts[selectedIndex].zoom || 1) * 100)} 
+                        onChange={(v) => {
+                          const newLayouts = [...layouts];
+                          newLayouts[selectedIndex] = {
+                            ...newLayouts[selectedIndex],
+                            zoom: Math.round(v) / 100
+                          };
+                          setLayouts(newLayouts);
+                        }} 
+                        min={100} 
+                        max={300} 
+                      />
+                      <p className="text-[9px] text-[var(--text-muted)] italic leading-tight">
+                        提示：直接在画布上拖拽图片可滑动显示区域。
+                      </p>
+                    </div>
+                  )}
+
                   {selectedTemplate.id === "free" && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-[var(--text-primary)]">
@@ -551,18 +715,46 @@ export function CollageDialog() {
 
                   <div>
                     <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-4 px-1">画布底色</label>
-                    <div className="grid grid-cols-5 gap-2 px-1">
+                    <div className="flex flex-wrap gap-3 px-1 items-center">
                       {BG_COLORS.map((color) => (
                         <button
                           key={color.value}
                           onClick={() => setBgColor(color.value)}
                           className={cn(
-                            "w-full aspect-square rounded-lg border border-white/5 transition-all shadow-sm",
-                            bgColor === color.value ? "ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-app)]" : "hover:scale-110"
+                            "w-8 h-8 rounded-full border border-white/10 transition-all shadow-sm relative",
+                            bgColor === color.value ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-[var(--bg-app)] scale-110" : "hover:scale-110"
                           )}
                           style={{ backgroundColor: color.value }}
                         />
                       ))}
+                      
+                      {/* 增强版自定义选色器 */}
+                      <div className="relative flex items-center">
+                        <div className="w-px h-6 bg-[var(--border-subtle)] mx-1 mr-3" />
+                        <label className="relative cursor-pointer group hover:scale-110 transition-transform">
+                          <input 
+                            type="color" 
+                            value={bgColor}
+                            onChange={(e) => setBgColor(e.target.value)}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                          <div 
+                            className={cn(
+                              "w-9 h-9 rounded-xl border-2 flex items-center justify-center transition-all",
+                              !BG_COLORS.some(c => c.value === bgColor) 
+                                ? "border-blue-500 shadow-lg" 
+                                : "border-dashed border-[var(--text-muted)] text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                            )}
+                            style={{ 
+                              backgroundColor: !BG_COLORS.some(c => c.value === bgColor) ? bgColor : 'transparent',
+                              color: !BG_COLORS.some(c => c.value === bgColor) ? (parseInt(bgColor.replace('#',''), 16) > 0x888888 ? '#000' : '#fff') : 'inherit'
+                            }}
+                          >
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-white text-[8px] rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap shadow-xl z-50">自定义底色</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </>

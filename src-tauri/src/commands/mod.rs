@@ -1,7 +1,7 @@
 use std::path::Path;
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
 use imageproc::drawing::draw_text_mut;
-use crate::models::{FileNode, ImageFileInfo, TextOverlay, HistogramData};
+use crate::models::{FileNode, ImageFileInfo, TextOverlay, HistogramData, CollageImageParams};
 use crate::services::{file_service, thumbnail_service, image_service, font_service};
 
 /// 获取图片直方图
@@ -339,7 +339,7 @@ pub async fn batch_resize(
 #[tauri::command]
 pub async fn create_collage(
     files: Vec<String>,
-    layout: Vec<(f32, f32, f32, f32)>, // (x%, y%, width%, height%) 相对位置
+    layout: Vec<CollageImageParams>, // 结构化参数
     text_overlays: Vec<TextOverlay>,
     canvas_width: u32,
     canvas_height: u32,
@@ -374,13 +374,13 @@ pub async fn create_collage(
             break;
         }
 
-        let (x_pct, y_pct, w_pct, h_pct) = layout[i];
+        let params = &layout[i];
 
-        // 计算实际像素位置和尺寸
-        let x = ((x_pct / 100.0) * canvas_width as f32) as u32 + spacing;
-        let y = ((y_pct / 100.0) * canvas_height as f32) as u32 + spacing;
-        let target_w = ((w_pct / 100.0) * canvas_width as f32) as u32 - spacing * 2;
-        let target_h = ((h_pct / 100.0) * canvas_height as f32) as u32 - spacing * 2;
+        // 计算实际像素位置和尺寸 (外框固定)
+        let x = ((params.x / 100.0) * canvas_width as f32) as u32 + spacing;
+        let y = ((params.y / 100.0) * canvas_height as f32) as u32 + spacing;
+        let target_w = ((params.width / 100.0) * canvas_width as f32) as u32 - spacing * 2;
+        let target_h = ((params.height / 100.0) * canvas_height as f32) as u32 - spacing * 2;
 
         if target_w == 0 || target_h == 0 {
             continue;
@@ -389,9 +389,29 @@ pub async fn create_collage(
         // 加载并调整图片大小
         match image::open(file_path) {
             Ok(img) => {
-                // 调整图片大小以填充目标区域，保持比例
-                let resized = img.resize_to_fill(target_w, target_h, image::imageops::FilterType::Lanczos3);
-                let rgba_img = resized.to_rgba8();
+                // 1. 实现内容缩放 (zoom) 与 位移 (offset)
+                let zoom = params.zoom.max(1.0);
+                
+                let scaled_w = (target_w as f32 * zoom) as u32;
+                let scaled_h = (target_h as f32 * zoom) as u32;
+                
+                let mut resized = img.resize_to_fill(scaled_w, scaled_h, image::imageops::FilterType::Lanczos3);
+                
+                // 2. 计算位移后的裁剪起点
+                // params.offset_x/y 是相对于可移动范围的百分比 (-50 到 50)
+                let base_x = (scaled_w - target_w) as f32 / 2.0;
+                let base_y = (scaled_h - target_h) as f32 / 2.0;
+                
+                // 计算实际偏移像素 (offset 是相对于中心的偏移)
+                let off_x = (params.offset_x / 100.0) * (scaled_w as f32);
+                let off_y = (params.offset_y / 100.0) * (scaled_h as f32);
+
+                let crop_x = (base_x - off_x).clamp(0.0, (scaled_w - target_w) as f32) as u32;
+                let crop_y = (base_y - off_y).clamp(0.0, (scaled_h - target_h) as f32) as u32;
+                
+                let cropped = resized.crop(crop_x, crop_y, target_w, target_h);
+                
+                let rgba_img = cropped.to_rgba8();
 
                 // 复制像素到画布，带圆角处理
                 for (px, py, pixel) in rgba_img.enumerate_pixels() {

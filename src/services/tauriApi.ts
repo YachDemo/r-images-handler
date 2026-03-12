@@ -294,12 +294,22 @@ export interface TextOverlay {
   bgPadding?: number | null;
 }
 
+export interface CollageImageParams {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zoom: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 /**
  * 创建拼图
  */
 export async function createCollage(
   files: string[],
-  layout: [number, number, number, number][], // [x%, y%, width%, height%]
+  layout: CollageImageParams[],
   textOverlays: TextOverlay[],
   canvasWidth: number,
   canvasHeight: number,
