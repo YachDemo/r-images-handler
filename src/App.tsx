@@ -48,43 +48,41 @@ function App() {
 
   // 监听拖拽事件
   useEffect(() => {
-    let unlisten: (() => void) | null = null;
+    let unlistenPromise: Promise<() => void> | null = null;
 
     const setupDragDrop = async () => {
       try {
-        const window = getCurrentWindow();
-        unlisten = await window.onDragDrop(async (event) => {
-          if (event.payload.type === "drop") {
-            const paths = event.payload.paths;
-            if (paths.length > 0) {
-              let targetFolder = "";
-              for (const path of paths) {
-                try {
-                  const type = await checkPathType(path);
-                  if (type === "dir") {
-                    targetFolder = path;
-                    break;
-                  }
-                } catch (e) {
-                  console.error("Check path type failed:", e);
+        const appWindow = getCurrentWindow();
+        unlistenPromise = appWindow.listen("tauri://drag-drop", async (event: any) => {
+          const { paths } = event.payload;
+          if (paths && paths.length > 0) {
+            let targetFolder = "";
+            for (const path of paths) {
+              try {
+                const type = await checkPathType(path);
+                if (type === "dir") {
+                  targetFolder = path;
+                  break;
                 }
+              } catch (e) {
+                console.error("Check path type failed:", e);
               }
+            }
 
-              if (!targetFolder) {
-                const firstPath = paths[0];
-                const lastSep = firstPath.lastIndexOf("/");
-                const lastSepWin = firstPath.lastIndexOf("\\");
-                const sepIndex = Math.max(lastSep, lastSepWin);
-                if (sepIndex !== -1) {
-                  targetFolder = firstPath.substring(0, sepIndex);
-                }
+            if (!targetFolder) {
+              const firstPath = paths[0];
+              const lastSep = firstPath.lastIndexOf("/");
+              const lastSepWin = firstPath.lastIndexOf("\\");
+              const sepIndex = Math.max(lastSep, lastSepWin);
+              if (sepIndex !== -1) {
+                targetFolder = firstPath.substring(0, sepIndex);
               }
+            }
 
-              if (targetFolder) {
-                addRootPath(targetFolder);
-                setSelectedPath(targetFolder);
-                triggerRefresh();
-              }
+            if (targetFolder) {
+              addRootPath(targetFolder);
+              setSelectedPath(targetFolder);
+              triggerRefresh();
             }
           }
         });
@@ -96,7 +94,9 @@ function App() {
     setupDragDrop();
 
     return () => {
-      if (unlisten) unlisten();
+      if (unlistenPromise) {
+        unlistenPromise.then((fn) => fn());
+      }
     };
   }, [addRootPath, setSelectedPath, triggerRefresh]);
 

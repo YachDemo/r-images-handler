@@ -1,5 +1,7 @@
 use std::path::Path;
-use crate::models::{FileNode, ImageFileInfo};
+use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
+use imageproc::drawing::draw_text_mut;
+use crate::models::{FileNode, ImageFileInfo, TextOverlay};
 use crate::services::{file_service, thumbnail_service, image_service, font_service};
 
 /// 扫描目录结构
@@ -331,6 +333,7 @@ pub async fn batch_resize(
 pub async fn create_collage(
     files: Vec<String>,
     layout: Vec<(f32, f32, f32, f32)>, // (x%, y%, width%, height%) 相对位置
+    text_overlays: Vec<TextOverlay>,
     canvas_width: u32,
     canvas_height: u32,
     spacing: u32,
@@ -441,7 +444,7 @@ pub async fn create_collage(
         }
     }
 
-    // 画布圆角裁剪逻辑 (New)
+    // 画布圆角裁剪逻辑
     if canvas_border_radius > 0 {
         let r = canvas_border_radius as f32;
         let w = canvas_width as f32;
@@ -481,6 +484,87 @@ pub async fn create_collage(
                 if is_outside {
                     canvas.put_pixel(x, y, Rgba([0, 0, 0, 0])); // 透明
                 }
+            }
+        }
+    }
+
+    // 绘制文字叠加
+    for overlay in text_overlays {
+        if let Some(font_data) = image_service::load_font(overlay.font_path.as_deref()) {
+            if let Ok(font) = FontRef::try_from_slice(&font_data) {
+                let r = u8::from_str_radix(&overlay.color[1..3], 16).unwrap_or(255);
+                let g = u8::from_str_radix(&overlay.color[3..5], 16).unwrap_or(255);
+                let b = u8::from_str_radix(&overlay.color[5..7], 16).unwrap_or(255);
+                let alpha = (overlay.opacity * 255.0) as u8;
+                let text_color = Rgba([r, g, b, alpha]);
+
+                let scale = PxScale::from(overlay.size);
+                
+                let x = ((overlay.x / 100.0) * canvas_width as f32) as i32;
+                let y = ((overlay.y / 100.0) * canvas_height as f32) as i32;
+
+                // 1. 绘制背景块
+                if let Some(bg_hex) = overlay.bg_color {
+                    let br = u8::from_str_radix(&bg_hex[1..3], 16).unwrap_or(0);
+                    let bg = u8::from_str_radix(&bg_hex[3..5], 16).unwrap_or(0);
+                    let bb = u8::from_str_radix(&bg_hex[5..7], 16).unwrap_or(0);
+                    let bg_color = Rgba([br, bg, bb, alpha]);
+                    
+                    let padding = overlay.bg_padding.unwrap_or(10.0);
+                    
+                    // 计算文本包围盒
+                    let scaled_font = font.as_scaled(scale);
+                    let mut text_w = 0.0;
+                    for c in overlay.text.chars() {
+                        text_w += scaled_font.h_advance(scaled_font.glyph_id(c));
+                    }
+                    let text_h = scaled_font.height();
+                    
+                    let bg_w = text_w + padding * 2.0;
+                    let bg_h = text_h + padding * 2.0;
+                    
+                    // 绘制简单矩形背景 (可选增强为圆角)
+                    for px in 0..(bg_w as u32) {
+                        for py in 0..(bg_h as u32) {
+                            let tx = (x + px as i32 - padding as i32) as u32;
+                            let ty = (y + py as i32 - (scaled_font.ascent() as i32 / 4)) as u32;
+                            if tx < canvas_width && ty < canvas_height {
+                                canvas.put_pixel(tx, ty, bg_color);
+                            }
+                        }
+                    }
+                }
+
+                // 2. 绘制阴影
+                if let Some(sh_hex) = overlay.shadow_color {
+                    if let Some((sx, sy)) = overlay.shadow_offset {
+                        let sr = u8::from_str_radix(&sh_hex[1..3], 16).unwrap_or(0);
+                        let sg = u8::from_str_radix(&sh_hex[3..5], 16).unwrap_or(0);
+                        let sb = u8::from_str_radix(&sh_hex[5..7], 16).unwrap_or(0);
+                        let sh_color = Rgba([sr, sg, sb, alpha]);
+                        draw_text_mut(&mut canvas, sh_color, x + sx as i32, y + sy as i32, scale, &font, &overlay.text);
+                    }
+                }
+
+                // 3. 绘制描边 (多方向偏移)
+                if let Some(st_hex) = overlay.stroke_color {
+                    let sw = overlay.stroke_width.unwrap_or(2.0) as i32;
+                    let str_r = u8::from_str_radix(&st_hex[1..3], 16).unwrap_or(0);
+                    let str_g = u8::from_str_radix(&st_hex[3..5], 16).unwrap_or(0);
+                    let str_b = u8::from_str_radix(&st_hex[5..7], 16).unwrap_or(0);
+                    let st_color = Rgba([str_r, str_g, str_b, alpha]);
+                    
+                    for dx in -sw..=sw {
+                        for dy in -sw..=sw {
+                            if dx != 0 || dy != 0 {
+                                draw_text_mut(&mut canvas, st_color, x + dx, y + dy, scale, &font, &overlay.text);
+                            }
+                        }
+                    }
+                }
+
+                // 4. 绘制主体文字
+                draw_text_mut(&mut canvas, text_color, x, y, scale, &font, &overlay.text);
             }
         }
     }

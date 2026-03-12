@@ -7,8 +7,7 @@ import {
   ChevronUp, 
   X, 
   Trash2,
-  Clock,
-  Layers
+  Clock
 } from "lucide-react";
 import { useBatchStore, type BatchTask } from "../../stores/batchStore";
 import { cn } from "../../utils/cn";

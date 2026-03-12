@@ -54,7 +54,7 @@ interface FileStore {
 
 export const useFileStore = create<FileStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       rootPaths: [],
       selectedPath: null,
       folderTrees: [],

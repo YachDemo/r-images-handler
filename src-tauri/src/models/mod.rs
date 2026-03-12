@@ -77,6 +77,26 @@ pub enum EditOperation {
     AdjustColors(ColorAdjustParams),
 }
 
+/// 拼图文字叠加参数
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextOverlay {
+    pub text: String,
+    pub x: f32,
+    pub y: f32,
+    pub size: f32,
+    pub color: String,
+    pub opacity: f32,
+    pub font_path: Option<String>,
+    // 新增装饰属性
+    pub stroke_color: Option<String>,
+    pub stroke_width: Option<f32>,
+    pub shadow_color: Option<String>,
+    pub shadow_offset: Option<(f32, f32)>,
+    pub bg_color: Option<String>,
+    pub bg_padding: Option<f32>,
+}
+
 /// 批量处理进度载荷
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

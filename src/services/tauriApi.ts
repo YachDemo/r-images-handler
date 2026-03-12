@@ -264,12 +264,29 @@ export async function batchResize(
   });
 }
 
+export interface TextOverlay {
+  text: string;
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  opacity: number;
+  fontPath: string | null;
+  strokeColor?: string | null;
+  strokeWidth?: number | null;
+  shadowColor?: string | null;
+  shadowOffset?: [number, number] | null;
+  bgColor?: string | null;
+  bgPadding?: number | null;
+}
+
 /**
  * 创建拼图
  */
 export async function createCollage(
   files: string[],
   layout: [number, number, number, number][], // [x%, y%, width%, height%]
+  textOverlays: TextOverlay[],
   canvasWidth: number,
   canvasHeight: number,
   spacing: number,
@@ -281,6 +298,7 @@ export async function createCollage(
   return invoke("create_collage", {
     files,
     layout,
+    textOverlays,
     canvasWidth,
     canvasHeight,
     spacing,

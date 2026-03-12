@@ -10,7 +10,7 @@ use font_kit::family_name::FamilyName;
 use font_kit::properties::Properties;
 
 /// 加载字体
-fn load_font(custom_path_or_name: Option<&str>) -> Option<Vec<u8>> {
+pub fn load_font(custom_path_or_name: Option<&str>) -> Option<Vec<u8>> {
     if let Some(s) = custom_path_or_name {
         // 1. 尝试作为文件路径加载
         if let Ok(bytes) = std::fs::read(s) {
